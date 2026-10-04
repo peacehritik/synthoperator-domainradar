@@ -1,6 +1,6 @@
 {
-  "name": "DomainRadar",
+  "name": "%APP_NAME%",
   "description": "AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence with deterministic valuation, RDAP lookup, and ROI scoring.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

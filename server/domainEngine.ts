@@ -1,4 +1,5 @@
 import dns from 'dns';
+import crypto from 'crypto';
 import { promisify } from 'util';
 import type {
   AuditVersionTrace,
@@ -29,6 +30,24 @@ import {
   type StrategyWeights,
 } from './typesafeJev.js';
 import { fetchFreeEvidence } from './freeEvidenceProvider.js';
+import { findComparableSales, type ComparableSaleMatch } from './comparableSalesProvider.js';
+
+/**
+ * Deterministic SHA-256 state hashing for Mode C brand selection reports
+ */
+export function generateBrandSelectionHash(
+  business: BusinessContext,
+  domains: string[]
+): string {
+  const sortedDomains = [...domains].map(sanitizeDomain).filter(Boolean).sort();
+  const canonical = canonicalizeJson({
+    mode: 'brand_selection',
+    questionSetVersion: BRAND_SELECTION_QUESTION_SET_VERSION,
+    business,
+    domains: sortedDomains,
+  });
+  return crypto.createHash('sha256').update(canonical).digest('hex');
+}
 
 export {
   generateStateHash,
@@ -167,11 +186,12 @@ export async function checkDomainAvailability(sanitizedDomain: string): Promise<
     const timeoutId = setTimeout(() => controller.abort(), 4500);
 
     const rdapUrl = `https://rdap.org/domain/${encodeURIComponent(sanitizedDomain)}`;
+    const appName = process.env.APP_NAME || 'DomainRadar';
     const response = await fetch(rdapUrl, {
       signal: controller.signal,
       headers: {
         Accept: 'application/rdap+json, application/json',
-        'User-Agent': 'DomainRadar-Engine/1.0',
+        'User-Agent': `${appName}-Engine/1.0`,
       },
     });
     clearTimeout(timeoutId);
@@ -349,16 +369,19 @@ export interface PriceRange {
   midpoint: number;
 }
 
+export type AcquisitionPricingStatus = 'available_registry' | 'user_specified' | 'unknown_aftermarket';
+
 export interface EconomicValuationResult {
   wholesale_range: PriceRange;
   retail_range: PriceRange;
-  estimated_annual_sale_probability_pct: number; // e.g., 2% to 25%
-  gross_expected_value_usd: number; // (retail_midpoint * probability)
-  acquisition_cost_usd: number;
-  estimated_transaction_fees_usd: number; // typically 10-15% of sale or registrar transfer fee
-  estimated_carrying_cost_usd: number; // 2 years registry renewals
-  net_actuarial_expected_value_usd: number; // gross_ev - acquisition - fees - carrying_cost
-  is_positive_roi_spread: boolean;
+  estimated_annual_sale_probability_pct: number;
+  gross_expected_value_usd: number;
+  acquisition_cost_usd: number | null;
+  acquisition_status: AcquisitionPricingStatus;
+  estimated_transaction_fees_usd: number;
+  estimated_carrying_cost_usd: number;
+  net_actuarial_expected_value_usd: number | null;
+  is_positive_roi_spread: boolean | null;
 }
 
 export interface HoldingEfficiencyResult {
@@ -386,6 +409,7 @@ export interface DomainValuation {
   referringDomainsCount: number | null;
   comparableSalesCount: number | null;
   medianComparableUsd: number | null;
+  comparables?: ComparableSaleMatch[];
   cpmTier: string;
   trademarkRisk: 'Low' | 'Medium' | 'High';
   estimatedValue: number;
@@ -402,7 +426,8 @@ export function calculateEconomicValuation(
   strategyType: DomainStrategyType,
   liquidityChoice: 'high_liquidity' | 'slow_speculative' | 'illiquid',
   brandScore: number,
-  askingPrice?: number
+  askingPrice?: number | null,
+  isDomainAvailable: boolean = false
 ): EconomicValuationResult {
   const isCom = valuation.extension.tld === '.com' || valuation.extension.tld === 'com';
   const isTier2 = valuation.extension.tier === 'Tier 2';
@@ -433,10 +458,12 @@ export function calculateEconomicValuation(
     liquidityChoice === 'illiquid' ? 0.5 : 1.0;
 
   const wholesaleMidpoint = Math.round(baseWholesale * liquidityMultiplier);
+  const wholesaleLow = Math.max(5, Math.round(wholesaleMidpoint * 0.70));
+  const wholesaleHigh = Math.max(15, Math.round(wholesaleMidpoint * 1.30));
   const wholesale_range: PriceRange = {
-    low: Math.max(5, Math.round(wholesaleMidpoint * 0.70)),
-    high: Math.max(15, Math.round(wholesaleMidpoint * 1.40)),
-    midpoint: wholesaleMidpoint,
+    low: wholesaleLow,
+    high: wholesaleHigh,
+    midpoint: Math.round((wholesaleLow + wholesaleHigh) / 2),
   };
 
   // 2. Retail End-User Range Modeling
@@ -488,10 +515,13 @@ export function calculateEconomicValuation(
     retailMidpoint = Math.round(retailMidpoint * 0.5);
   }
 
+  // Symmetrical bounds (Rule 11: Exact arithmetic mean matches midpoint)
+  const retailLow = Math.max(25, Math.round(retailMidpoint * 0.70));
+  const retailHigh = Math.max(50, Math.round(retailMidpoint * 1.30));
   const retail_range: PriceRange = {
-    low: Math.max(25, Math.round(retailMidpoint * 0.65)),
-    high: Math.max(50, Math.round(retailMidpoint * 1.55)),
-    midpoint: retailMidpoint,
+    low: retailLow,
+    high: retailHigh,
+    midpoint: Math.round((retailLow + retailHigh) / 2),
   };
 
   // 3. Actuarial Annual Sale Probability
@@ -509,16 +539,32 @@ export function calculateEconomicValuation(
   }
 
   const gross_expected_value_usd = Math.round(retail_range.midpoint * (probPct / 100));
-  const acquisition_cost_usd = askingPrice !== undefined && askingPrice > 0
-    ? askingPrice
-    : Math.max(20, Math.round(retail_range.midpoint * 0.25));
-  const estimated_transaction_fees_usd = Math.round(gross_expected_value_usd * 0.12);
-  const estimated_carrying_cost_usd = valuation.annualCarryingCost * 2; // 2 years holding
+  const estimated_transaction_fees_usd = Math.round(gross_expected_value_usd * 0.15); // 15% broker/marketplace cut
+  const estimated_carrying_cost_usd = valuation.annualCarryingCost * 2; // 2 years registry renewals
 
-  const net_actuarial_expected_value_usd =
-    gross_expected_value_usd - acquisition_cost_usd - estimated_transaction_fees_usd - estimated_carrying_cost_usd;
+  // Deterministic Acquisition Cost Determination (Rule 06: Never fabricate an acquisition price)
+  let acquisition_cost_usd: number | null = null;
+  let acquisition_status: AcquisitionPricingStatus = 'unknown_aftermarket';
 
-  const is_positive_roi_spread = net_actuarial_expected_value_usd > 0;
+  if (askingPrice !== undefined && askingPrice !== null && askingPrice > 0) {
+    acquisition_cost_usd = askingPrice;
+    acquisition_status = 'user_specified';
+  } else if (isDomainAvailable) {
+    acquisition_cost_usd = valuation.annualCarryingCost; // Standard registration fee
+    acquisition_status = 'available_registry';
+  } else {
+    acquisition_cost_usd = null;
+    acquisition_status = 'unknown_aftermarket';
+  }
+
+  let net_actuarial_expected_value_usd: number | null = null;
+  let is_positive_roi_spread: boolean | null = null;
+
+  if (acquisition_cost_usd !== null) {
+    net_actuarial_expected_value_usd =
+      gross_expected_value_usd - acquisition_cost_usd - estimated_transaction_fees_usd - estimated_carrying_cost_usd;
+    is_positive_roi_spread = net_actuarial_expected_value_usd > 0;
+  }
 
   return {
     wholesale_range,
@@ -526,6 +572,7 @@ export function calculateEconomicValuation(
     estimated_annual_sale_probability_pct: probPct,
     gross_expected_value_usd,
     acquisition_cost_usd,
+    acquisition_status,
     estimated_transaction_fees_usd,
     estimated_carrying_cost_usd,
     net_actuarial_expected_value_usd,
@@ -649,9 +696,11 @@ export function calculateDomainValuation(domain: string): DomainValuation {
   const backlinksCount: number | null = null;
   const referringDomainsCount: number | null = null;
 
-  // Comparable sales history: verified for ultra-premium 3-4L .com, null otherwise
-  const comparableSalesCount: number | null = length <= 4 && ext.tier === 'Tier 1' ? 8 : length <= 6 && ext.tld === '.com' ? 3 : null;
-  const medianComparableUsd: number | null = comparableSalesCount !== null ? (length <= 3 ? 12500 : length === 4 ? 4200 : 1600) : null;
+  // Real Public Comparable Sales Discovery (Deterministic Match)
+  const compsQuery = findComparableSales(sanitized, sld, ext.tld, length, syllables, keywordMatches);
+  const comparableSalesCount: number | null = compsQuery.comparableSalesCount;
+  const medianComparableUsd: number | null = compsQuery.medianComparableUsd;
+  const comparables = compsQuery.comparables;
 
   // Valuation algorithm ($)
   let baseVal = 200;
@@ -700,6 +749,7 @@ export function calculateDomainValuation(domain: string): DomainValuation {
     referringDomainsCount,
     comparableSalesCount,
     medianComparableUsd,
+    comparables,
     cpmTier,
     trademarkRisk,
     estimatedValue,
@@ -722,7 +772,7 @@ export interface HardGateEvaluation {
 export type CapitalDiligenceTier = 'micro' | 'mid' | 'high' | 'institutional';
 
 export interface RiskBudgetReport {
-  acquisition_price_usd: number;
+  acquisition_price_usd: number | null;
   diligence_tier: CapitalDiligenceTier;
   tier_label: string;
   required_evidence_coverage_pct: number;
@@ -754,15 +804,15 @@ export function evaluateRiskEngine(
 
   const isTmCriticalOrHigh = tmChoice === 'critical' || tmChoice === 'high' || valuation.trademarkRisk === 'High';
 
-  // GATE 1: Intellectual Property Collision (Trademark Gate)
+  // GATE 1: Intellectual Property Collision (Rule 11: Screened, not a legal clearance)
   const gate1: HardGateEvaluation = {
     id: 'gate_trademark',
-    name: 'Intellectual Property Collision Gate',
-    description: 'Checks for critical trademark collision against protected corporate marks.',
+    name: 'Known-Brand Collision Screen',
+    description: 'Screens against 1,000+ top global trademarks. Does not constitute formal legal trademark clearance.',
     status: isTmCriticalOrHigh ? 'blocked' : 'passed',
     triggered: isTmCriticalOrHigh,
     reason: isTmCriticalOrHigh
-      ? 'Fatal trademark collision detected. Acquisition blocked to protect capital from UDRP/legal forfeiture.'
+      ? 'Trademark collision detected against protected brands. Acquisition blocked to protect capital from UDRP/legal forfeiture.'
       : null,
   };
 
@@ -780,21 +830,23 @@ export function evaluateRiskEngine(
       : null,
   };
 
-  // GATE 3: Capital-Proportional Risk Budgeting
-  const acquisitionPrice = economicVal?.acquisition_cost_usd || state.economics.asking_or_backorder_price || 30;
+  // GATE 3: Capital-Proportional Risk Budgeting (Rule 06: Honest exposure reflection)
+  const rawAcqPrice = economicVal?.acquisition_cost_usd ?? state.economics.asking_or_backorder_price ?? null;
+  const effectivePrice = rawAcqPrice !== null ? rawAcqPrice : (mode === 'buy' ? 14 : 14);
+
   let diligenceTier: CapitalDiligenceTier = 'micro';
   let tierLabel = 'Micro-Capital Tier (< $30)';
   let requiredCoverage = 35;
 
-  if (acquisitionPrice >= 2500) {
+  if (effectivePrice >= 2500) {
     diligenceTier = 'institutional';
     tierLabel = 'Institutional-Capital Tier (> $2,500)';
     requiredCoverage = 85;
-  } else if (acquisitionPrice >= 500) {
+  } else if (effectivePrice >= 500) {
     diligenceTier = 'high';
     tierLabel = 'High-Capital Tier ($500 - $2,500)';
     requiredCoverage = 75;
-  } else if (acquisitionPrice >= 30) {
+  } else if (effectivePrice >= 30) {
     diligenceTier = 'mid';
     tierLabel = 'Mid-Capital Tier ($30 - $500)';
     requiredCoverage = 55;
@@ -817,7 +869,7 @@ export function evaluateRiskEngine(
   };
 
   const riskBudget: RiskBudgetReport = {
-    acquisition_price_usd: acquisitionPrice,
+    acquisition_price_usd: rawAcqPrice,
     diligence_tier: diligenceTier,
     tier_label: tierLabel,
     required_evidence_coverage_pct: requiredCoverage,
@@ -825,18 +877,45 @@ export function evaluateRiskEngine(
     is_diligence_satisfied: isDiligenceSatisfied,
   };
 
-  // GATE 4: Negative Actuarial Spread Gate
-  const isNegativeSpread = mode === 'buy' && (economicVal?.net_actuarial_expected_value_usd ?? 0) < 0 && acquisitionPrice > 50;
-  const gate4: HardGateEvaluation = {
-    id: 'gate_actuarial_spread',
-    name: 'Negative Actuarial Spread Gate',
-    description: 'Guards against acquisitions where projected 2-year carrying drag yields negative net expected value.',
-    status: isNegativeSpread ? 'warning' : 'passed',
-    triggered: isNegativeSpread,
-    reason: isNegativeSpread
-      ? 'Expected actuarial resale yield after 2 years of carrying drag does not justify current asking price.'
-      : null,
-  };
+  // GATE 4: Mode A (Acquisition Net EV Gate) vs Mode B (Holding Efficiency & Sunk Cost Gate)
+  let gate4: HardGateEvaluation;
+
+  if (mode === 'buy') {
+    const isPriceUnknown = economicVal?.acquisition_status === 'unknown_aftermarket';
+    const isNegativeSpread = economicVal?.net_actuarial_expected_value_usd !== null && (economicVal?.net_actuarial_expected_value_usd ?? 0) < 0 && (rawAcqPrice ?? 0) > 50;
+
+    gate4 = {
+      id: 'gate_actuarial_spread',
+      name: isPriceUnknown ? 'Acquisition Price Requirement Gate' : 'Negative Expected Value Gate',
+      description: isPriceUnknown
+        ? 'Requires confirmed asking price before executing automated acquisition calculations on registered domains.'
+        : 'Guards against acquisitions where projected carrying drag and acquisition outlay yield negative net expected value.',
+      status: isPriceUnknown || isNegativeSpread ? 'warning' : 'passed',
+      triggered: isPriceUnknown || isNegativeSpread,
+      reason: isPriceUnknown
+        ? 'Domain is registered. Asking price is required to calculate Net Expected Value and ROI spread.'
+        : isNegativeSpread
+        ? 'Expected net resale yield after broker fees and 2-year carrying drag does not justify current asking price.'
+        : null,
+    };
+  } else {
+    // Mode B: Portfolio Holding Efficiency & Drag Gate (Forward-Looking Cashflow)
+    const annualRenewal = valuation.annualCarryingCost;
+    const parkingRev = state.metrics_evidence.annual_parking_revenue_usd ?? 0;
+    const inbounds = state.metrics_evidence.inbound_inquiries_12m ?? 0;
+    const isDragDeficit = parkingRev === 0 && inbounds === 0 && (state.holding_years ?? 1) >= 2 && valuation.wholesaleLiquidationValue < annualRenewal * 2;
+
+    gate4 = {
+      id: 'gate_holding_efficiency',
+      name: 'Portfolio Carrying Drag & Sunk Cost Gate',
+      description: 'Evaluates whether forward-looking monetization and inbound demand justify annual registry carrying fees.',
+      status: isDragDeficit ? 'warning' : 'passed',
+      triggered: isDragDeficit,
+      reason: isDragDeficit
+        ? `Zero monetization and zero inbound inquiries recorded over ${state.holding_years ?? 2} years. Carrying fees exceed residual liquidation value.`
+        : null,
+    };
+  }
 
   const evaluatedGates = [gate1, gate2, gate3, gate4];
   const blockedGate = evaluatedGates.find((g) => g.status === 'blocked');
@@ -919,7 +998,7 @@ export function generateExplainabilityReport(
   if (isCom) {
     bull_signals.push({
       id: 'bull_tld_equity',
-      label: 'Tier 1 .com extension provides global authority and maximum buyer liquidity.',
+      label: 'Tier 1 .com extension provides broad global market reach and baseline investor liquidity.',
       source: 'TLD Registry',
       impact: 'high',
     });
@@ -944,7 +1023,7 @@ export function generateExplainabilityReport(
   if (!state.structure.has_hyphens_or_digits) {
     bull_signals.push({
       id: 'bull_clean_structure',
-      label: 'Pure alphanumeric structure with zero typing leakage.',
+      label: 'Pure alphanumeric structure with no digits or hyphens, minimizing typing friction.',
       source: 'Deterministic Parser',
       impact: 'medium',
     });
@@ -960,13 +1039,13 @@ export function generateExplainabilityReport(
     });
   }
 
-  // Free Evidence Provider: Google Autocomplete Demand
-  if (freeEvidence?.googleSuggest.suggestion_count && freeEvidence.googleSuggest.suggestion_count > 0) {
+  // Free Evidence Provider: Google Autocomplete Demand (Rule 01: Do not over-interpret single suggestions)
+  if (freeEvidence?.googleSuggest?.has_commercial_intent_tokens && (freeEvidence.googleSuggest.suggestion_count ?? 0) >= 2) {
     bull_signals.push({
       id: 'bull_google_suggest',
-      label: `Active organic query autocomplete demand (${freeEvidence.googleSuggest.suggestion_count} related search suggestions${freeEvidence.googleSuggest.has_commercial_intent_tokens ? ' with commercial intent' : ''}).`,
+      label: `Commercial search intent detected (${freeEvidence.googleSuggest.suggestion_count} queries in Google Suggest).`,
       source: 'Google Suggest (Free)',
-      impact: freeEvidence.googleSuggest.has_commercial_intent_tokens ? 'high' : 'medium',
+      impact: 'medium',
     });
   }
 
@@ -1018,11 +1097,11 @@ export function generateExplainabilityReport(
     });
   }
 
-  if (economicVal && economicVal.net_actuarial_expected_value_usd > 0) {
+  if (economicVal && economicVal.net_actuarial_expected_value_usd !== null && economicVal.net_actuarial_expected_value_usd > 0) {
     bull_signals.push({
       id: 'bull_positive_ev',
-      label: 'Positive expected actuarial yield over 2-year holding horizon.',
-      source: 'Actuarial Engine',
+      label: 'Positive expected net yield over 2-year holding horizon.',
+      source: 'Net EV Engine',
       impact: 'high',
     });
   }
@@ -1133,11 +1212,11 @@ export function generateExplainabilityReport(
     });
   }
 
-  if (mode === 'buy' && economicVal && !economicVal.is_positive_roi_spread) {
+  if (mode === 'buy' && economicVal && economicVal.is_positive_roi_spread === false) {
     bear_signals.push({
       id: 'bear_negative_spread',
-      label: 'Negative expected actuarial resale yield after 2-year carrying drag.',
-      source: 'Actuarial Engine',
+      label: 'Negative expected net resale yield after broker fees and 2-year carrying drag.',
+      source: 'Net EV Engine',
       impact: 'high',
     });
   }
@@ -1276,7 +1355,8 @@ export function generateExplainabilityReport(
 }
 
 export interface EvidenceBreakdown {
-  dataQualityPct: number; // 0 to 100
+  dataQualityPct: number; // 0 to 100 (Commercial Decision Diligence)
+  telemetryQualityPct?: number; // 0 to 100 (Observed Automated Telemetry)
   jevConfidence: number; // 0 to 100
   compositeScore: number; // 0 to 100
   hardGateTriggered: string | null;
@@ -1385,7 +1465,8 @@ export function buildDomainState(
   const tld = valuation.extension.tld;
   const isPronounceable = valuation.pronounceabilityScore >= 60;
   const hasNumbersOrHyphens = /[\d-]/.test(sld);
-  const isDictWord = valuation.keywordMatch.length > 0 || (sld.length <= 8 && isPronounceable && !hasNumbersOrHyphens);
+  // Rule 01: Only mark as dictionary word if it legitimately matches proven commercial vocabulary
+  const isDictWord = valuation.keywordMatch.length > 0;
   const isBuyMode = mode === 'buy';
 
   // Construct Explicit DomainMetricsEvidence with priority rules
@@ -1489,12 +1570,13 @@ export function buildDomainState(
     is_verified: true,
   };
 
-  // 5. Wayback Machine Source Tag
+  // 5. Wayback Machine Source Tag (Rule 13: 0 snapshots is an observed fact, not unknown)
+  const waybackObserved = freeEvidence?.wayback !== undefined;
   sources['wayback'] = {
-    value: freeEvidence?.wayback.has_historical_snapshots ? `${freeEvidence.wayback.snapshot_count} snapshots` : null,
+    value: waybackObserved ? `${freeEvidence.wayback.snapshot_count} snapshots` : null,
     source: 'wayback_cdx_public',
     source_label: 'Wayback CDX (Free)',
-    is_verified: Boolean(freeEvidence?.wayback.has_historical_snapshots),
+    is_verified: waybackObserved,
   };
 
   // 6. Google Autocomplete Source Tag
@@ -1530,6 +1612,7 @@ export function buildDomainState(
     inbound_inquiries_12m: inboundInquiries,
     comparable_sales_count: valuation.comparableSalesCount !== null ? valuation.comparableSalesCount : null,
     median_comparable_usd: valuation.medianComparableUsd !== null ? valuation.medianComparableUsd : null,
+    comparable_sales: valuation.comparables,
     wayback_snapshot_count: freeEvidence?.wayback.snapshot_count,
     wayback_first_seen_year: freeEvidence?.wayback.first_seen_year,
     wayback_last_seen_year: freeEvidence?.wayback.last_seen_year,
@@ -1581,36 +1664,32 @@ export function buildDomainState(
   // 5. Structure Integrity Scan
   verifiedFields.push('Structure Integrity Scan');
 
-  // 6. Local Trademark Collision Scan
-  if (freeEvidence?.trademarkScan) {
-    verifiedFields.push('Local Brand Trademark Scan');
-  } else {
-    unknownFields.push('Local Brand Trademark Scan');
-  }
+  // 6. Local Trademark Collision Scan (Always verified via local trie)
+  verifiedFields.push('Local Brand Trademark Scan');
 
-  // 7. Wayback Machine Historical Archive
-  if (freeEvidence?.wayback) {
+  // 7. Wayback Machine Historical Archive (Rule 02: Only verified if actual snapshots exist)
+  if (freeEvidence?.wayback?.has_historical_snapshots && (freeEvidence.wayback.snapshot_count ?? 0) > 0) {
     verifiedFields.push('Wayback Machine Archive History');
   } else {
     unknownFields.push('Wayback Machine Archive History');
   }
 
-  // 8. Google Autocomplete Demand
-  if (freeEvidence?.googleSuggest) {
+  // 8. Google Autocomplete Demand (Only verified if commercial intent or multiple suggestions)
+  if ((freeEvidence?.googleSuggest?.suggestion_count ?? 0) >= 2 || freeEvidence?.googleSuggest?.has_commercial_intent_tokens) {
     verifiedFields.push('Google Autocomplete Demand');
   } else {
     unknownFields.push('Google Autocomplete Demand');
   }
 
-  // 9. Node DNS & Mail Routing
-  if (freeEvidence?.dns) {
+  // 9. Node DNS & Mail Routing (Only verified if domain is resolving)
+  if (freeEvidence?.dns?.is_resolving) {
     verifiedFields.push('DNS & MX Mail Routing');
   } else {
     unknownFields.push('DNS & MX Mail Routing');
   }
 
-  // 10. Wikipedia Knowledge Graph
-  if (freeEvidence?.wikipedia) {
+  // 10. Wikipedia Knowledge Graph (Only verified if genuine encyclopedic entity match)
+  if (freeEvidence?.wikipedia?.is_encyclopedic_term) {
     verifiedFields.push('Wikipedia Knowledge Graph');
   } else {
     unknownFields.push('Wikipedia Knowledge Graph');
@@ -1642,9 +1721,23 @@ export function buildDomainState(
     ? Object.values(manualOverrides).filter((v) => v !== undefined && v !== null && v !== '').length
     : 0;
 
+  // Automated Telemetry Coverage: Ratio of automated free telemetry channels successfully probed
+  const telemetryProbes = [
+    Boolean(rdap && (rdap.status === 'available' || rdap.status === 'registered')),
+    Boolean(freeEvidence?.dns !== undefined),
+    Boolean(freeEvidence?.trademarkScan !== undefined),
+    Boolean(freeEvidence?.wayback !== undefined),
+    Boolean(freeEvidence?.googleSuggest !== undefined),
+    Boolean(freeEvidence?.wikipedia !== undefined),
+    Boolean(valuation.pronounceabilityScore > 0),
+  ];
+  const observedTelemetryCount = telemetryProbes.filter(Boolean).length;
+  const telemetryCoveragePct = Math.round((observedTelemetryCount / telemetryProbes.length) * 100);
+
   const coveragePct = Math.min(100, Math.round((verifiedFields.length / 12) * 100));
   const coverageReport: EvidenceCoverageReport = {
     coverage_pct: coveragePct,
+    telemetry_coverage_pct: telemetryCoveragePct,
     verified_fields: verifiedFields,
     unknown_fields: unknownFields,
     free_signals_count: freeSignalsCount,
@@ -1654,7 +1747,7 @@ export function buildDomainState(
   const askingPrice = isBuyMode
     ? (manualOverrides?.custom_asking_price_usd !== undefined && manualOverrides.custom_asking_price_usd !== null && Number(manualOverrides.custom_asking_price_usd) > 0
         ? Number(manualOverrides.custom_asking_price_usd)
-        : Math.max(20, Math.round(valuation.estimatedValue * 0.45)))
+        : (rdap?.status === 'available' ? valuation.annualCarryingCost : null))
     : undefined;
 
   const renewalPrice = renewalInput?.annualRenewalCost || valuation.annualCarryingCost;
@@ -1700,7 +1793,8 @@ export function computeBuyDecision(
   rdap: RDAPResult,
   jev?: JEVResponse,
   freeEvidence?: FreeEvidenceReport,
-  manualOverrides?: UserManualEvidenceOverrides
+  manualOverrides?: UserManualEvidenceOverrides,
+  customWeights?: StrategyWeights
 ): BuyDecisionResult {
   const state = buildDomainState(valuation.domain, valuation, rdap, undefined, 'buy', freeEvidence, manualOverrides);
   const isCom = valuation.extension.tld === '.com' || valuation.extension.tld === 'com';
@@ -1708,8 +1802,37 @@ export function computeBuyDecision(
 
   // 1. Determine Strategy Archetype & Dynamic Weighting Profile
   const strategyChoice: DomainStrategyType = jev?.modeAAnswers?.domain_strategy_type?.choice || classifyDomainStrategy(state);
-  const strategyProfile: StrategyProfileResult = getStrategyProfile(strategyChoice);
-  const weights = strategyProfile.applied_weights;
+  const defaultProfile: StrategyProfileResult = getStrategyProfile(strategyChoice);
+
+  // Normalize custom weights if provided by user
+  let weights = defaultProfile.applied_weights;
+  let strategyProfile = defaultProfile;
+
+  if (customWeights && typeof customWeights === 'object') {
+    const rawSum =
+      (Number(customWeights.brandability) || 0) +
+      (Number(customWeights.memorability) || 0) +
+      (Number(customWeights.commercial_search) || 0) +
+      (Number(customWeights.liquidity) || 0) +
+      (Number(customWeights.tld_equity) || 0) +
+      (Number(customWeights.economics_spread) || 0);
+
+    if (rawSum > 0) {
+      weights = {
+        brandability: (Number(customWeights.brandability) || 0) / rawSum,
+        memorability: (Number(customWeights.memorability) || 0) / rawSum,
+        commercial_search: (Number(customWeights.commercial_search) || 0) / rawSum,
+        liquidity: (Number(customWeights.liquidity) || 0) / rawSum,
+        tld_equity: (Number(customWeights.tld_equity) || 0) / rawSum,
+        economics_spread: (Number(customWeights.economics_spread) || 0) / rawSum,
+      };
+      strategyProfile = {
+        ...defaultProfile,
+        label: `${defaultProfile.label} (Custom Weights)`,
+        applied_weights: weights,
+      };
+    }
+  }
 
   // 2. Compute 6 Normalized Metric Dimensions (0 to 100)
   const brandScore = jev?.modeAAnswers?.brandability?.score ?? (valuation.brandabilityScore >= 75 ? 3 : valuation.brandabilityScore >= 50 ? 2 : 1);
@@ -1768,13 +1891,15 @@ export function computeBuyDecision(
 
   const confidence = jev?.confidence ?? 0.85;
 
-  // 4. Calculate Economic Valuation & Actuarial EV
+  // 4. Calculate Economic Valuation & Net EV (Rule 06 compliant)
+  const isAvailable = rdap.status === 'available';
   const economicValuation = calculateEconomicValuation(
     valuation,
     strategyChoice,
     liquidityChoice,
     brandScore,
-    state.economics.asking_or_backorder_price
+    state.economics.asking_or_backorder_price,
+    isAvailable
   );
 
   // 5. Evaluate Inviolable Hard Gates & Risk Engine
@@ -1830,12 +1955,19 @@ export function computeBuyDecision(
         summary = capitalGate.reason || 'Capital outlay requires higher verified data coverage before executing purchase.';
         bannerClass = 'bg-amber-50 border-amber-200 text-amber-900';
       } else if (spreadGate && spreadGate.status === 'warning') {
-        // Gate 4: Negative Actuarial Expected Value Spread
-        verdict = compositeScore < 60 ? 'Pass' : 'Review';
-        statusLabel = compositeScore < 60 ? 'PASS' : 'REVIEW';
-        hardGateTriggered = 'Negative Actuarial EV Spread';
-        headline = 'Review: Negative Actuarial EV Spread';
-        summary = spreadGate.reason || 'Expected actuarial resale yield after 2 years of carrying drag does not justify current asking price.';
+        verdict = 'Review';
+        if (economicValuation.acquisition_status === 'unknown_aftermarket') {
+          statusLabel = 'PRICE_REQUIRED';
+          hardGateTriggered = 'Asking Price Required';
+          headline = 'Review: Acquisition Price Required';
+          summary = 'Structural and market indicators evaluated. Final acquisition decision requires seller asking price.';
+        } else {
+          statusLabel = compositeScore < 60 ? 'PASS' : 'REVIEW';
+          verdict = compositeScore < 60 ? 'Pass' : 'Review';
+          hardGateTriggered = 'Negative Expected Value';
+          headline = 'Review: Negative Net Expected Value Spread';
+          summary = spreadGate.reason || 'Expected net resale yield does not justify asking price.';
+        }
         bannerClass = 'bg-amber-50 border-amber-200 text-amber-900';
       } else {
         verdict = 'Buy';
@@ -1933,6 +2065,7 @@ export function computeBuyDecision(
 
   const evidence: EvidenceBreakdown = {
     dataQualityPct: state.data_quality_pct,
+    telemetryQualityPct: state.coverage_report.telemetry_coverage_pct ?? 100,
     jevConfidence: Math.round(confidence * 100),
     compositeScore,
     hardGateTriggered,
@@ -2136,6 +2269,7 @@ export function computeRenewalDecision(
 
   const evidence: EvidenceBreakdown = {
     dataQualityPct: state.data_quality_pct,
+    telemetryQualityPct: state.coverage_report.telemetry_coverage_pct ?? 100,
     jevConfidence: Math.round(confidence * 100),
     compositeScore,
     hardGateTriggered,
@@ -2503,6 +2637,22 @@ export async function evaluateBrandSelection(
       ? `Potential trademark friction flagged against "${freeEvidence.trademarkScan.matched_brand_name || 'established corporate brand'}". Comprehensive legal clearance recommended before incorporation.`
       : `No significant trademark conflicts identified in the sources checked as of ${currentDateStr}. Professional legal review advised before incorporation.`;
 
+    const candidateHash = generateStateHash(domain, item.jevState, BRAND_SELECTION_QUESTION_SET_VERSION, 'brand_selection');
+    const candidateVersionTrace: AuditVersionTrace = {
+      engine_version: ENGINE_VERSION,
+      question_set_version: BRAND_SELECTION_QUESTION_SET_VERSION,
+      model: 'jev-latest',
+      state_hash: candidateHash,
+      timestamp: new Date().toISOString(),
+      cache_hit: false,
+      cache_ttl_seconds_remaining: Math.round(CACHE_TTLS.STATE_HASH / 1000),
+      latency_ms: jev.latencyMs,
+      execution_source: jev.source === 'api.typesafe.ai' ? 'primary_jev_api' : 'local_contract_fallback',
+      canonical_state_json: canonicalizeJson(item.jevState),
+      cache_expires_at: new Date(Date.now() + CACHE_TTLS.STATE_HASH).toISOString(),
+      upstream_error: jev.upstream_error,
+    };
+
     return {
       domain,
       rank: 1, // updated below
@@ -2523,6 +2673,10 @@ export async function evaluateBrandSelection(
       rdap,
       free_evidence: freeEvidence,
       jevAnswers: modeC,
+      version_trace: candidateVersionTrace,
+      rawJevPayload: jev.rawJevPayload,
+      rawJevResponse: jev.rawJevResponse,
+      latencyMs: jev.latencyMs,
     };
   });
 
@@ -2605,5 +2759,19 @@ export async function evaluateBrandSelection(
     cross_domain_tradeoffs: crossDomainTradeoffs,
     unobserved_gaps: unobservedGaps,
     timestamp: new Date().toISOString(),
+    version_trace: {
+      engine_version: ENGINE_VERSION,
+      question_set_version: BRAND_SELECTION_QUESTION_SET_VERSION,
+      model: 'jev-latest',
+      state_hash: generateBrandSelectionHash(business, cleanDomains),
+      timestamp: new Date().toISOString(),
+      cache_hit: false,
+      cache_ttl_seconds_remaining: Math.round(CACHE_TTLS.STATE_HASH / 1000),
+      latency_ms: rawResults.reduce((max, r) => Math.max(max, r.jev.latencyMs), 0),
+      execution_source: rawResults.some((r) => r.jev.source === 'api.typesafe.ai')
+        ? 'primary_jev_api'
+        : 'local_contract_fallback',
+      cache_expires_at: new Date(Date.now() + CACHE_TTLS.STATE_HASH).toISOString(),
+    },
   };
 }

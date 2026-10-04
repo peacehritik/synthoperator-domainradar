@@ -60,12 +60,19 @@ export const JevInspectorModal: React.FC<JevInspectorModalProps> = ({
 
   const questionsObj = rawJevPayload?.questions || {};
   const questionKeys = Object.keys(questionsObj);
-  const isModeB = mode === 'renew' || 
+  const isModeC = mode === 'brand_selection' ||
+    'business_fit' in questionsObj ||
+    versionTrace?.question_set_version?.includes('brand') ||
+    rawJevResponse?.mode === 'brand_selection';
+
+  const isModeB = !isModeC && (mode === 'renew' || 
     'renewal_justification' in questionsObj || 
     versionTrace?.question_set_version?.includes('renewal') ||
-    rawJevResponse?.mode === 'renew';
+    rawJevResponse?.mode === 'renew');
 
-  const isolatedBadgeLabel = isModeB
+  const isolatedBadgeLabel = isModeC
+    ? 'Mode C Isolated Payload (5 questions - Brand Selection)'
+    : isModeB
     ? 'Mode B Isolated Payload (5 questions - Renewal only)'
     : 'Mode A Isolated Payload (6 questions - Acquisition only)';
 
@@ -120,7 +127,9 @@ export const JevInspectorModal: React.FC<JevInspectorModalProps> = ({
                 )}
                 {/* Validation Badge */}
                 <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold border ${
-                  isModeB
+                  isModeC
+                    ? 'bg-purple-50 text-purple-800 border-purple-200'
+                    : isModeB
                     ? 'bg-blue-50 text-blue-800 border-blue-200'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 }`}>

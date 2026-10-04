@@ -3,16 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DomainRadar: AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence</title>
-    <meta name="description" content="AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence with deterministic valuation, RDAP lookup, and ROI scoring." />
-    <meta property="og:title" content="DomainRadar: AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence" />
-    <meta property="og:description" content="AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence with deterministic valuation, RDAP lookup, and ROI scoring." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>%APP_NAME%: Autonomous AI Decision Engine for Domain Buy, Drop, and Renewal Intelligence</title>
+    <meta name="description" content="Autonomous Domain Decision Intelligence Engine for investors and founders. Evaluates secondary acquisitions (Mode A), portfolio retention vs drop (Mode B), and startup brand selection (Mode C) with deterministic Net EV and 4 hard risk gates." />
+    <meta name="keywords" content="domain appraisal, domain decision intelligence, Net EV, domain valuation, RDAP lookup, domain renewal drop, brand naming matrix, domain portfolio management" />
+    <link rel="canonical" href="%APP_URL%/" />
+    <meta property="og:site_name" content="%APP_NAME%" />
+    <meta property="og:title" content="%APP_NAME%: Autonomous AI Decision Engine for Domain Valuation, Buy & Renewal" />
+    <meta property="og:description" content="Invest, retain, or drop domains with 0% guesswork. Deterministic RDAP, 7 free telemetry sources, and actuarial Net EV modeling." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="%APP_URL%/" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@hafid_bas" />
+    <meta name="twitter:title" content="%APP_NAME%: Autonomous Domain Decision Intelligence" />
+    <meta name="twitter:description" content="Deterministic domain valuation, portfolio retention economics, and startup brand selection with zero paid API costs. Built by SynthOperator." />
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "%APP_NAME%",
+            "operatingSystem": "All",
+            "applicationCategory": "BusinessApplication",
+            "author": {
+              "@type": "Person",
+              "name": "Hafid Bas",
+              "url": "https://x.com/hafid_bas"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "description": "Autonomous Domain Decision Intelligence Platform featuring deterministic RDAP lookups, actuarial Net EV calculations, and multi-domain startup brand selection."
+          },
+          {
+            "@type": "Organization",
+            "name": "SynthOperator",
+            "url": "%APP_URL%/",
+            "founder": {
+              "@type": "Person",
+              "name": "Hafid Bas"
+            },
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "email": "support@synthoperator.com",
+              "contactType": "Customer Support"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

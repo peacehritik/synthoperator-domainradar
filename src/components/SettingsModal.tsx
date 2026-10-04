@@ -6,20 +6,68 @@ import {
   RefreshCw, 
   Check, 
   Zap, 
-  Wifi, 
-  AlertTriangle,
+  Sliders,
+  RotateCcw,
   CheckCircle2,
   AlertCircle 
 } from 'lucide-react';
+import { siteConfig } from '../config/site';
+import { useLanguage } from '../context/LanguageContext';
+import type { StrategyWeights } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const DEFAULT_WEIGHTS: StrategyWeights = {
+  brandability: 0.35,
+  memorability: 0.25,
+  commercial_search: 0.05,
+  liquidity: 0.15,
+  tld_equity: 0.15,
+  economics_spread: 0.05,
+};
+
+const WEIGHT_PRESETS: { key: string; label: string; weights: StrategyWeights }[] = [
+  {
+    key: 'preset_default',
+    label: 'Archetype Default',
+    weights: DEFAULT_WEIGHTS,
+  },
+  {
+    key: 'preset_brand',
+    label: 'Brand-First',
+    weights: { brandability: 0.40, memorability: 0.30, commercial_search: 0.05, liquidity: 0.10, tld_equity: 0.10, economics_spread: 0.05 },
+  },
+  {
+    key: 'preset_seo',
+    label: 'SEO / Search-First',
+    weights: { brandability: 0.05, memorability: 0.05, commercial_search: 0.40, liquidity: 0.20, tld_equity: 0.15, economics_spread: 0.15 },
+  },
+  {
+    key: 'preset_liq',
+    label: 'Liquidity-First',
+    weights: { brandability: 0.10, memorability: 0.05, commercial_search: 0.05, liquidity: 0.45, tld_equity: 0.20, economics_spread: 0.15 },
+  },
+];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'api' | 'weights'>('api');
+
   const [typesafeKey, setTypesafeKey] = useState(() => {
     return localStorage.getItem('typesafe_api_key') || '';
+  });
+
+  const [weights, setWeights] = useState<StrategyWeights>(() => {
+    try {
+      const storageKey = `${siteConfig.name.toLowerCase()}_custom_weights`;
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : DEFAULT_WEIGHTS;
+    } catch {
+      return DEFAULT_WEIGHTS;
+    }
   });
 
   const [testingConnection, setTestingConnection] = useState(false);
@@ -60,6 +108,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const totalWeightPct = Math.round(
+    ((weights.brandability || 0) +
+      (weights.memorability || 0) +
+      (weights.commercial_search || 0) +
+      (weights.liquidity || 0) +
+      (weights.tld_equity || 0) +
+      (weights.economics_spread || 0)) *
+      100
+  );
+
+  const handleWeightChange = (key: keyof StrategyWeights, valPct: number) => {
+    setWeights((prev) => ({
+      ...prev,
+      [key]: Math.max(0, Math.min(100, valPct)) / 100,
+    }));
+  };
+
+  const handleApplyPreset = (presetWeights: StrategyWeights) => {
+    setWeights(presetWeights);
+  };
+
   if (!isOpen) return null;
 
   const handleSave = (e: React.FormEvent) => {
@@ -70,13 +139,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       localStorage.removeItem('typesafe_api_key');
     }
 
+    const weightsStorageKey = `${siteConfig.name.toLowerCase()}_custom_weights`;
+    localStorage.setItem(weightsStorageKey, JSON.stringify(weights));
+
     window.dispatchEvent(new Event('typesafe_key_updated'));
+    window.dispatchEvent(new Event(`${siteConfig.name.toLowerCase()}_weights_updated`));
     setSaved(true);
-    checkStatus(typesafeKey.trim());
     setTimeout(() => {
       setSaved(false);
       onClose();
-    }, 800);
+    }, 700);
   };
 
   return (
@@ -90,10 +162,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                TypeSafe AI (JEV System One) Configuration
+                {t('settings_title')}
               </h3>
               <p className="text-[11px] text-slate-500">
-                Decision engine authentication and upstream endpoint routing
+                {t('settings_subtitle')}
               </p>
             </div>
           </div>
@@ -105,81 +177,257 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 px-5 pt-2 bg-slate-50/50 gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('api')}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors inline-flex items-center space-x-1.5 ${
+              activeTab === 'api'
+                ? 'border-emerald-600 text-emerald-900'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>TypeSafe API</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('weights')}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors inline-flex items-center space-x-1.5 ${
+              activeTab === 'weights'
+                ? 'border-emerald-600 text-emerald-900'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{t('settings_tab_weights')}</span>
+          </button>
+        </div>
+
         <form onSubmit={handleSave} className="p-5 space-y-4">
-          {/* TypeSafe AI Configuration Section */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-slate-900">TypeSafe AI JEV Engine</span>
-                <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
-                  System One
+          {activeTab === 'api' ? (
+            /* TypeSafe AI Configuration Section */
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-slate-900">{t('settings_engine_name')}</span>
+                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
+                    System One
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-slate-500">
+                  model: jev-latest
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-slate-500">
-                model: jev-latest
-              </span>
-            </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                TypeSafe API Key (TYPESAFE_API_KEY)
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  placeholder="ts_live_... or custom authorization key"
-                  value={typesafeKey}
-                  onChange={(e) => setTypesafeKey(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
-                />
-                <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Saved in localStorage and relayed via <code className="font-mono bg-slate-200/70 px-1 rounded">x-typesafe-key</code> header to Express.
-              </span>
-            </div>
-
-            {/* Connection Status Box */}
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-              <div className="flex items-center space-x-2">
-                {connectionStatus.status === 'connected' ? (
-                  <span className="flex items-center space-x-1.5 font-semibold text-emerald-700">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Connected to api.typesafe.ai</span>
-                  </span>
-                ) : connectionStatus.status === 'invalid_key' ? (
-                  <span className="flex items-center space-x-1.5 font-semibold text-rose-700">
-                    <AlertCircle className="w-4 h-4 text-rose-600" />
-                    <span>API Key Invalid (Local Fallback Active)</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center space-x-1.5 text-slate-600">
-                    <ShieldCheck className="w-4 h-4 text-slate-500" />
-                    <span>Local Contract Simulation Ready</span>
-                  </span>
-                )}
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {t('settings_api_key_label')}
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder="ts_live_... or custom authorization key"
+                    value={typesafeKey}
+                    onChange={(e) => setTypesafeKey(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
+                  />
+                  <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                </div>
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  {t('settings_api_key_hint')}
+                </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => checkStatus(typesafeKey.trim())}
-                disabled={testingConnection}
-                className="inline-flex items-center space-x-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 px-2.5 py-1 bg-white border border-slate-200 rounded shadow-2xs hover:bg-slate-50"
-              >
-                {testingConnection ? (
-                  <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
-                ) : (
-                  <RefreshCw className="w-3 h-3 text-slate-500" />
-                )}
-                <span>Test Connection</span>
-              </button>
+              {/* Connection Status Box */}
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2">
+                  {connectionStatus.status === 'connected' ? (
+                    <span className="flex items-center space-x-1.5 font-semibold text-emerald-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>{t('settings_status_connected')}</span>
+                    </span>
+                  ) : connectionStatus.status === 'invalid_key' ? (
+                    <span className="flex items-center space-x-1.5 font-semibold text-rose-700">
+                      <AlertCircle className="w-4 h-4 text-rose-600" />
+                      <span>{t('settings_status_invalid')}</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center space-x-1.5 text-slate-600">
+                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      <span>{t('settings_status_fallback')}</span>
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => checkStatus(typesafeKey.trim())}
+                  disabled={testingConnection}
+                  className="inline-flex items-center space-x-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 px-2.5 py-1 bg-white border border-slate-200 rounded shadow-2xs hover:bg-slate-50"
+                >
+                  {testingConnection ? (
+                    <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3 text-slate-500" />
+                  )}
+                  <span>{t('btn_test_conn')}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Custom Investment Weights Sliders Section */
+            <div className="space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block">{t('weights_strategy_title')}</span>
+                  <span className="text-[11px] text-slate-500">{t('weights_strategy_desc')}</span>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                    totalWeightPct === 100
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}>
+                    {totalWeightPct}% Total
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Strategy Presets */}
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">Presets:</span>
+                {WEIGHT_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => handleApplyPreset(p.weights)}
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-[11px] font-medium transition-colors"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sliders Grid */}
+              <div className="space-y-2.5 text-xs">
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_brandability')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.brandability || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.brandability || 0) * 100)}
+                    onChange={(e) => handleWeightChange('brandability', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_memorability')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.memorability || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.memorability || 0) * 100)}
+                    onChange={(e) => handleWeightChange('memorability', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_search')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.commercial_search || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.commercial_search || 0) * 100)}
+                    onChange={(e) => handleWeightChange('commercial_search', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_liquidity')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.liquidity || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.liquidity || 0) * 100)}
+                    onChange={(e) => handleWeightChange('liquidity', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_tld')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.tld_equity || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.tld_equity || 0) * 100)}
+                    onChange={(e) => handleWeightChange('tld_equity', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                    <span className="font-semibold">{t('weight_economics')}</span>
+                    <span className="font-mono font-bold text-slate-900">{Math.round((weights.economics_spread || 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={Math.round((weights.economics_spread || 0) * 100)}
+                    onChange={(e) => handleWeightChange('economics_spread', Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-[11px] text-slate-500">
+                <span>Weights auto-normalize to 100% on execution.</span>
+                <button
+                  type="button"
+                  onClick={() => setWeights(DEFAULT_WEIGHTS)}
+                  className="inline-flex items-center space-x-1 text-slate-600 hover:text-rose-600 font-medium"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Defaults</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer Controls */}
           <div className="pt-2 flex items-center justify-between border-t border-slate-200">
             <span className="text-[11px] text-slate-500 font-mono">
-              POST https://api.typesafe.ai/v1/systemone
+              {activeTab === 'api' ? 'POST https://api.typesafe.ai/v1/systemone' : 'Local Investment Policy'}
             </span>
 
             <div className="flex space-x-2">
@@ -188,7 +436,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 onClick={onClose}
                 className="px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-md"
               >
-                Cancel
+                {t('btn_cancel')}
               </button>
               <button
                 type="submit"
@@ -200,7 +448,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     <span>Saved</span>
                   </>
                 ) : (
-                  <span>Save Configuration</span>
+                  <span>{t('btn_save_config')}</span>
                 )}
               </button>
             </div>

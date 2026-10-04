@@ -1,8 +1,30 @@
+# Dépendances & Environnements
 node_modules/
-build/
 dist/
+build/
 coverage/
-.DS_Store
-*.log
+.vite/
+
+# Fichiers d'environnement & Secrets (Stricte exclusion)
 .env*
 !.env.example
+
+# Données locales d'audits & Fichiers temporaires atomiques
+data_outcomes.json
+*.tmp
+*.tmp.*
+
+# Fichiers et Outils de Développement Local
+bridge.py
+codebase.md
+plan.md
+.digestignore
+start_bridge.*
+
+# Logs & Fichiers Système
+*.log
+npm-debug.log*
+yarn-debug.log*
+.DS_Store
+Thumbs.db
+.ai_backups/

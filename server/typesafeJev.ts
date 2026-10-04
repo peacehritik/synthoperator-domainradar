@@ -53,6 +53,17 @@ export interface MetricSourceTag {
   is_verified: boolean;
 }
 
+export interface ComparableSaleMatch {
+  domain: string;
+  sale_price_usd: number;
+  sale_date: string;
+  venue: string;
+  similarity_score: number;
+  match_reason: string;
+  source: 'public_reported_sale';
+  status: 'observed';
+}
+
 export interface DomainMetricsEvidence {
   exact_search_volume: number | null;
   cpc_usd: number | null;
@@ -62,6 +73,7 @@ export interface DomainMetricsEvidence {
   inbound_inquiries_12m: number | null;
   comparable_sales_count: number | null;
   median_comparable_usd: number | null;
+  comparable_sales?: ComparableSaleMatch[];
   // Free evidence enrichments
   wayback_snapshot_count?: number;
   wayback_first_seen_year?: number | null;
@@ -82,6 +94,7 @@ export interface DomainMetricsEvidence {
 
 export interface EvidenceCoverageReport {
   coverage_pct: number; // 0 to 100
+  telemetry_coverage_pct?: number; // 0 to 100
   verified_fields: string[];
   unknown_fields: string[];
   free_signals_count?: number;
@@ -104,7 +117,7 @@ export interface DomainState {
   };
   metrics_evidence: DomainMetricsEvidence;
   economics: {
-    asking_or_backorder_price?: number;
+    asking_or_backorder_price?: number | null;
     annual_renewal_cost: number;
   };
   context_mode?: 'buy' | 'renewal';
@@ -235,7 +248,7 @@ export const JEV_MODE_A_QUESTIONS = {
     instructions:
       NULL_SAFETY_PREFIX +
       'Rate the commercial brandability, syllabic crispness, and enterprise naming power of this domain based strictly on confirmed structural evidence.',
-    levels: [
+    criteria: [
       'Unusable: Highly obscure, awkward phonetic flow, meaningless numbers or hyphens.',
       'Weak: Clunky or elongated, low enterprise or consumer recall.',
       'Average: Clear generic or descriptive phrase, decent clarity.',
@@ -321,7 +334,7 @@ export const JEV_MODE_B_QUESTIONS = {
     instructions:
       NULL_SAFETY_PREFIX +
       'Rate the long-term commercial brandability and portfolio retention value.',
-    levels: [
+    criteria: [
       'Unusable: No commercial retention value.',
       'Weak: Low brandability and low resale interest.',
       'Average: Viable long-tail domain.',
@@ -340,7 +353,7 @@ export const JEV_MODE_C_QUESTIONS = {
     instructions:
       NULL_SAFETY_PREFIX +
       'Rate the naming naturalness, positioning match, and category authority of this domain specifically for state.business.',
-    levels: [
+    criteria: [
       'Mismatched: Irrelevant or confusing naming disconnect with the business vertical.',
       'Marginal: Passable secondary fit, but lacks punch or category alignment.',
       'Strong: Intuitive positioning, credible identity, and natural industry resonance.',
@@ -352,7 +365,7 @@ export const JEV_MODE_C_QUESTIONS = {
     instructions:
       NULL_SAFETY_PREFIX +
       'Rate phonetic memorability, pronunciation fluidity, and startup credibility.',
-    levels: [
+    criteria: [
       'Weak: High syllabic friction, awkward spelling, or weak credibility.',
       'Acceptable: Solid, easy to spell, reasonable startup credibility.',
       'High Brand Equity: Exceptional word-of-mouth fluidity, memorable, and premium stature.'
@@ -1016,17 +1029,18 @@ export async function queryTypeSafeJEV(
     return evaluateJEVLocally(state as DomainState, mode, startTime, true);
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
+  try {
+    const appName = process.env.APP_NAME || 'DomainRadar';
     const response = await fetch('https://api.typesafe.ai/v1/systemone', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
         'x-typesafe-key': apiKey,
-        'User-Agent': 'DomainRadar-JevSystemOne/2.0',
+        'User-Agent': `${appName}-JevSystemOne/2.0`,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -1061,10 +1075,19 @@ export async function queryTypeSafeJEV(
 
     const detectedStrategy: DomainStrategyType = (rawAnswers.domain_strategy_type?.choice || classifyDomainStrategy(state as DomainState)) as DomainStrategyType;
 
+    const parseNoul = (field: any, fallback = 0.5): number => {
+      if (!field) return fallback;
+      if (typeof field.noul === 'number') return field.noul;
+      if (typeof field.value === 'number') return field.value;
+      return fallback;
+    };
+
     if (mode === 'buy') {
-      const bScore = rawAnswers.brandability?.score ?? 2;
-      const bNorm = bScore === 4 ? 100 : bScore === 3 ? 85 : bScore === 2 ? 60 : bScore === 1 ? 35 : 10;
+      const rawBScore = rawAnswers.brandability?.score ?? 2;
+      const bScore = typeof rawBScore === 'number' ? rawBScore : parseFloat(rawBScore) || 2;
+      const bNorm = Math.round((bScore / 4) * 100);
       const brandLevels = ['Unusable', 'Weak', 'Average', 'Strong', 'Premium'];
+      const roundedLevelIndex = Math.min(4, Math.max(0, Math.round(bScore)));
 
       const tmChoice = (rawAnswers.trademark_risk?.choice || 'clear') as 'clear' | 'low' | 'moderate' | 'high' | 'critical';
       const tmFlagged = tmChoice === 'critical' || tmChoice === 'high';
@@ -1075,13 +1098,13 @@ export async function queryTypeSafeJEV(
           confidence: rawAnswers.domain_strategy_type?.confidence || 0.90,
         },
         brandability: {
-          score: bScore,
+          score: Math.round(bScore * 10) / 10,
           confidence: rawAnswers.brandability?.confidence || 0.88,
           normalizedPercentage: bNorm,
-          levelLabel: brandLevels[Math.min(4, Math.max(0, bScore))],
+          levelLabel: brandLevels[roundedLevelIndex],
         },
         startup_memorability: {
-          value: typeof rawAnswers.startup_memorability?.value === 'number' ? rawAnswers.startup_memorability.value : 0.65,
+          value: parseNoul(rawAnswers.startup_memorability, 0.55),
           confidence: rawAnswers.startup_memorability?.confidence || 0.85,
         },
         trademark_risk: {
@@ -1095,7 +1118,7 @@ export async function queryTypeSafeJEV(
           probabilities: rawAnswers.aftermarket_liquidity?.probabilities,
         },
         speculative_drag: {
-          value: typeof rawAnswers.speculative_drag?.value === 'number' ? rawAnswers.speculative_drag.value : 0.45,
+          value: parseNoul(rawAnswers.speculative_drag, 0.50),
           confidence: rawAnswers.speculative_drag?.confidence || 0.80,
         },
       };

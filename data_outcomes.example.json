@@ -1,0 +1,53 @@
+[
+  {
+    "id": "out_demo_01",
+    "domain": "paywave.com",
+    "strategy_type": "exact_match_keyword",
+    "audit_date": "2026-01-15",
+    "engine_version": "2.4.0",
+    "initial_verdict": "Buy",
+    "initial_score": 94,
+    "initial_ev_usd": 48000,
+    "actual_acquisition_price_usd": 3200,
+    "outcome_status": "sold_profitable",
+    "actual_sale_price_usd": 48000,
+    "holding_duration_days": 180,
+    "realized_net_pnl_usd": 44786,
+    "realized_roi_pct": 1399.6,
+    "notes": "Verified public transaction via Sedo aftermarket brokerage."
+  },
+  {
+    "id": "out_demo_02",
+    "domain": "hyperagent.ai",
+    "strategy_type": "tech_trend",
+    "audit_date": "2026-02-10",
+    "engine_version": "2.4.0",
+    "initial_verdict": "Renew",
+    "initial_score": 88,
+    "initial_ev_usd": 12500,
+    "actual_acquisition_price_usd": 1200,
+    "outcome_status": "holding",
+    "actual_sale_price_usd": null,
+    "holding_duration_days": 120,
+    "realized_net_pnl_usd": null,
+    "realized_roi_pct": null,
+    "notes": "Core AI venture asset held in portfolio for 2026 exit."
+  },
+  {
+    "id": "out_demo_03",
+    "domain": "cheap-free-downloads-123.xyz",
+    "strategy_type": "exact_match_keyword",
+    "audit_date": "2026-03-01",
+    "engine_version": "2.4.0",
+    "initial_verdict": "Drop",
+    "initial_score": 22,
+    "initial_ev_usd": 35,
+    "actual_acquisition_price_usd": 14,
+    "outcome_status": "dropped_abandoned",
+    "actual_sale_price_usd": null,
+    "holding_duration_days": 365,
+    "realized_net_pnl_usd": -28,
+    "realized_roi_pct": -200.0,
+    "notes": "Zero organic traffic and negative carrying efficiency. Released on expiry."
+  }
+]

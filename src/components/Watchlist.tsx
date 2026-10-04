@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
+import { siteConfig } from '../config/site';
+import { useLanguage, LtrIsolate } from '../context/LanguageContext';
 import type { DecisionMode, WatchlistDomain } from '../types';
 
 interface WatchlistProps {
@@ -25,6 +27,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({
   onUpdateNotes,
   onSelectDomainForSingleAudit,
 }) => {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
 
   const filtered = watchlist.filter((w) =>
@@ -44,7 +47,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(watchlist, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `domainradar_portfolio_${Date.now()}.json`);
+    downloadAnchor.setAttribute('download', `${siteConfig.name.toLowerCase()}_portfolio_${Date.now()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -57,10 +60,10 @@ export const Watchlist: React.FC<WatchlistProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Portfolio Carrying & Asset Watchlist
+              {t('watch_title')}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Active holding ledger for tracking renewal obligations, parking cash flow, and exit valuations.
+              {t('watch_subtitle')}
             </p>
           </div>
 
@@ -70,7 +73,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md text-xs font-semibold border border-slate-300 transition-colors self-start sm:self-auto"
             >
               <Download className="w-3.5 h-3.5 text-slate-600" />
-              <span>Export Ledger</span>
+              <span>{t('watch_btn_export')}</span>
             </button>
           )}
         </div>
@@ -78,7 +81,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({
         {/* Financial KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <span className="text-xs text-slate-500 block">Total Portfolio Value</span>
+            <span className="text-xs text-slate-500 block">{t('watch_total_val')}</span>
             <span className="text-2xl font-bold font-mono text-slate-900 mt-1 block">
               ${totalValue.toLocaleString()}
             </span>
@@ -88,39 +91,39 @@ export const Watchlist: React.FC<WatchlistProps> = ({
           </div>
 
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <span className="text-xs text-slate-500 block">Annual Carrying Obligation</span>
+            <span className="text-xs text-slate-500 block">{t('watch_carrying_ob')}</span>
             <span className="text-2xl font-bold font-mono text-slate-900 mt-1 block">
-              ${totalCarry.toLocaleString()}/yr
+              <LtrIsolate>${totalCarry.toLocaleString()}/yr</LtrIsolate>
             </span>
             <span className="text-[11px] text-slate-500 mt-0.5 block">
-              Registry renewals total
+              {t('watch_renewals_total')}
             </span>
           </div>
 
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <span className="text-xs text-slate-500 block">Net Portfolio Yield</span>
+            <span className="text-xs text-slate-500 block">{t('watch_net_yield')}</span>
             <span
               className={`text-2xl font-bold font-mono mt-1 block ${
                 netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'
               }`}
             >
-              {netCashflow >= 0 ? '+' : ''}${netCashflow.toLocaleString()}/yr
+              <LtrIsolate>{netCashflow >= 0 ? '+' : ''}${netCashflow.toLocaleString()}/yr</LtrIsolate>
             </span>
             <span className="text-[11px] text-slate-500 mt-0.5 block">
-              Parking revenue minus carry
+              {t('watch_parking_minus_carry')}
             </span>
           </div>
 
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <span className="text-xs text-slate-500 block">Drop / Pass Warnings</span>
+            <span className="text-xs text-slate-500 block">{t('watch_warnings')}</span>
             <div className="flex items-baseline space-x-1.5 mt-1">
               <span className="text-2xl font-bold font-mono text-rose-700">
                 {dropCandidates.length}
               </span>
-              <span className="text-xs text-slate-500">assets</span>
+              <span className="text-xs text-slate-500">{t('watch_assets_count')}</span>
             </div>
             <span className="text-[11px] text-rose-600 font-medium mt-0.5 block">
-              Potential carry waste
+              {t('watch_potential_waste')}
             </span>
           </div>
         </div>
@@ -147,9 +150,9 @@ export const Watchlist: React.FC<WatchlistProps> = ({
         {filtered.length === 0 ? (
           <div className="p-10 text-center text-slate-500">
             <FolderKanban className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-            <p className="text-sm font-medium text-slate-700">No domains in watchlist</p>
+            <p className="text-sm font-medium text-slate-700">{t('watch_empty_title')}</p>
             <p className="text-xs text-slate-500 mt-1">
-              Audit domains in Mode A or Mode B and click "Track in Portfolio" to monitor them here.
+              {t('watch_empty_desc')}
             </p>
           </div>
         ) : (
@@ -157,13 +160,13 @@ export const Watchlist: React.FC<WatchlistProps> = ({
             <table className="w-full text-left text-xs sm:text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Domain</th>
-                  <th className="px-4 py-3">Mode</th>
-                  <th className="px-4 py-3">Verdict</th>
-                  <th className="px-4 py-3 text-right">Est. Value</th>
-                  <th className="px-4 py-3 text-right">Carrying Cost</th>
-                  <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3 text-center">Action</th>
+                  <th className="px-4 py-3">{t('th_domain')}</th>
+                  <th className="px-4 py-3">{t('th_mode')}</th>
+                  <th className="px-4 py-3">{t('th_verdict')}</th>
+                  <th className="px-4 py-3 text-right">{t('th_est_value')}</th>
+                  <th className="px-4 py-3 text-right">{t('th_carrying_cost')}</th>
+                  <th className="px-4 py-3">{t('th_notes')}</th>
+                  <th className="px-4 py-3 text-center">{t('th_action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -194,7 +197,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({
                       ${item.estimatedValue?.toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-slate-600">
-                      ${item.annualCarryingCost}/yr
+                      <LtrIsolate>${item.annualCarryingCost}/yr</LtrIsolate>
                     </td>
                     <td className="px-4 py-3">
                       <input

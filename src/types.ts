@@ -1,3 +1,19 @@
+export type SupportedLanguage = 'en' | 'fr' | 'es' | 'pt' | 'ar';
+
+export type DataStatus = 'observed' | 'derived' | 'estimated' | 'unknown' | 'failed';
+
+export type SourceType = 'official' | 'first_party' | 'commercial' | 'public' | 'user' | 'internal' | 'unobserved';
+
+export interface Evidence<T> {
+  value: T | null;
+  status: DataStatus;
+  source: SourceType;
+  sourceLabel: string;
+  retrievedAt?: string;
+  confidence?: number;
+  methodology?: string;
+}
+
 export type DecisionMode = 'buy' | 'renew' | 'brand_selection' | 'renewal';
 
 export interface ExtensionInfo {
@@ -14,16 +30,19 @@ export interface PriceRange {
   midpoint: number;
 }
 
+export type AcquisitionPricingStatus = 'available_registry' | 'user_specified' | 'unknown_aftermarket';
+
 export interface EconomicValuationResult {
   wholesale_range: PriceRange;
   retail_range: PriceRange;
-  estimated_annual_sale_probability_pct: number; // e.g., 2% to 25%
-  gross_expected_value_usd: number; // (retail_midpoint * probability)
-  acquisition_cost_usd: number;
-  estimated_transaction_fees_usd: number; // typically 10-15% of sale or registrar transfer fee
+  estimated_annual_sale_probability_pct: number; // P_sale: 2% to 25%
+  gross_expected_value_usd: number; // (retail_midpoint * P_sale)
+  acquisition_cost_usd: number | null;
+  acquisition_status: AcquisitionPricingStatus;
+  estimated_transaction_fees_usd: number; // Broker & platform fees (15%)
   estimated_carrying_cost_usd: number; // 2 years registry renewals
-  net_actuarial_expected_value_usd: number; // gross_ev - acquisition - fees - carrying_cost
-  is_positive_roi_spread: boolean;
+  net_actuarial_expected_value_usd: number | null; // Net Expected Value (null if price unknown)
+  is_positive_roi_spread: boolean | null;
 }
 
 export interface HoldingEfficiencyResult {
@@ -51,12 +70,24 @@ export interface DomainValuation {
   referringDomainsCount: number | null;
   comparableSalesCount: number | null;
   medianComparableUsd: number | null;
+  comparables?: ComparableSaleMatch[];
   cpmTier: string;
   trademarkRisk: 'Low' | 'Medium' | 'High';
   estimatedValue: number;
   wholesaleLiquidationValue: number;
   annualCarryingCost: number;
   economic_valuation?: EconomicValuationResult;
+}
+
+export interface ComparableSaleMatch {
+  domain: string;
+  sale_price_usd: number;
+  sale_date: string;
+  venue: string;
+  similarity_score: number;
+  match_reason: string;
+  source: 'public_reported_sale';
+  status: 'observed';
 }
 
 export interface UserManualEvidenceOverrides {
@@ -140,7 +171,7 @@ export interface DomainMetricsEvidence {
   inbound_inquiries_12m: number | null;
   comparable_sales_count: number | null;
   median_comparable_usd: number | null;
-  // Free evidence enrichments
+  comparable_sales?: ComparableSaleMatch[];
   wayback_snapshot_count?: number;
   wayback_first_seen_year?: number | null;
   wayback_last_seen_year?: number | null;
@@ -154,12 +185,12 @@ export interface DomainMetricsEvidence {
   dns_nameservers?: string[];
   trademark_risk_score?: 'clear' | 'low' | 'high';
   trademark_matched_brand?: string | null;
-  // Granular source tags
   sources?: Record<string, MetricSourceTag>;
 }
 
 export interface EvidenceCoverageReport {
-  coverage_pct: number; // 0 to 100
+  coverage_pct: number; // Commercial Decision Diligence Coverage
+  telemetry_coverage_pct?: number; // Total Observed Telemetry Coverage
   verified_fields: string[];
   unknown_fields: string[];
   free_signals_count?: number;
@@ -186,12 +217,12 @@ export interface JEVChoiceAnswer<T = string> {
 }
 
 export interface JEVNoulAnswer {
-  value: number; // 0.0 to 1.0 probability
+  value: number;
   confidence?: number;
 }
 
 export interface JEVScoreAnswer {
-  score: number; // 0 to 4
+  score: number;
   confidence?: number;
   normalizedPercentage: number;
   levelLabel: string;
@@ -266,25 +297,32 @@ export interface BusinessContext {
 
 export interface CandidateEvaluationResult {
   domain: string;
-  rank: number; // 1 = Recommended, 2 = Strong Alternative, etc.
+  rank: number;
   status: 'recommended' | 'strong_alternative' | 'viable_budget' | 'avoid_risk';
-  business_fit_score: number; // 0-100
-  brand_strength_score: number; // 0-100
-  trust_tld_score: number; // 0-100
-  risk_score: number; // 0-100 (100 = completely clear)
-  economics_score: number; // 0-100
-  composite_decision_score: number; // 0-100
+  business_fit_score: number;
+  brand_strength_score: number;
+  trust_tld_score: number;
+  risk_score: number;
+  economics_score: number;
+  composite_decision_score: number;
   jev_confidence: number;
   evidence_coverage: number;
   why_recommended_points: string[];
   why_not_this_domain_points: string[];
   hard_risk_triggered: boolean;
-  trademark_legal_status: string; // e.g. "No significant trademark conflicts identified in checked sources as of..."
+  trademark_legal_status: string;
   valuation?: DomainValuation;
   rdap?: any;
   free_evidence?: FreeEvidenceReport;
   jevAnswers?: ModeCJevAnswers;
   version_trace?: AuditVersionTrace;
+  rawJevPayload?: {
+    model: string;
+    state: Record<string, any>;
+    questions: Record<string, any>;
+  };
+  rawJevResponse?: Record<string, any>;
+  latencyMs?: number;
 }
 
 export interface ComparativeDecisionReport {
@@ -330,6 +368,7 @@ export interface JEVResponse {
 
 export interface EvidenceBreakdown {
   dataQualityPct: number;
+  telemetryQualityPct?: number;
   jevConfidence: number;
   compositeScore: number;
   hardGateTriggered: string | null;
@@ -363,7 +402,7 @@ export interface HardGateEvaluation {
 export type CapitalDiligenceTier = 'micro' | 'mid' | 'high' | 'institutional';
 
 export interface RiskBudgetReport {
-  acquisition_price_usd: number;
+  acquisition_price_usd: number | null;
   diligence_tier: CapitalDiligenceTier;
   tier_label: string;
   required_evidence_coverage_pct: number;
@@ -376,37 +415,37 @@ export interface RiskEngineResult {
   blocked_by_gate: string | null;
   evaluated_gates: HardGateEvaluation[];
   risk_budget: RiskBudgetReport;
-  final_override_verdict: string | null; // e.g. "RISK_BLOCKED", "INSUFFICIENT_EVIDENCE", or null if clear
+  final_override_verdict: string | null;
 }
 
 export interface EvidenceSignal {
   id: string;
   label: string;
-  source: string; // e.g. "Deterministic Parser", "TLD Registry", "TypeSafe JEV", "RDAP"
+  source: string;
   impact: 'high' | 'medium' | 'low';
 }
 
 export interface NextActionItem {
   id: string;
   action: string;
-  target_dimension: string; // e.g., "Market Valuation", "Trademark Due Diligence", "SEO History"
+  target_dimension: string;
   priority: 'critical' | 'recommended' | 'optional';
-  suggested_tool_or_source: string; // e.g., "NameBio / Dan.com", "USPTO / WIPO Registry", "Wayback Machine"
+  suggested_tool_or_source: string;
 }
 
 export interface ExplainabilityReport {
-  bull_signals: EvidenceSignal[]; // Positive confirmed facts
-  bear_signals: EvidenceSignal[]; // Negative confirmed risks
-  unknown_signals: EvidenceSignal[]; // Missing or unobserved data points
-  next_actions: NextActionItem[]; // Specific actionable steps to resolve uncertainty
+  bull_signals: EvidenceSignal[];
+  bear_signals: EvidenceSignal[];
+  unknown_signals: EvidenceSignal[];
+  next_actions: NextActionItem[];
 }
 
 export interface AuditVersionTrace {
-  engine_version: string; // e.g. "2.4.0"
-  question_set_version: string; // e.g. "acquisition-v2.1" or "renewal-v2.1"
-  model: string; // "jev-latest"
-  state_hash: string; // 64-char SHA-256 hash
-  timestamp: string; // ISO 8601
+  engine_version: string;
+  question_set_version: string;
+  model: string;
+  state_hash: string;
+  timestamp: string;
   cache_hit: boolean;
   cache_ttl_seconds_remaining?: number;
   latency_ms: number;
@@ -430,6 +469,7 @@ export interface AuditRequestOptions {
   monthlyImpressions?: number;
   force_refresh?: boolean;
   manual_overrides?: UserManualEvidenceOverrides;
+  custom_weights?: StrategyWeights;
 }
 
 export interface BuyDecisionResult {

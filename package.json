@@ -1,7 +1,10 @@
 {
-  "name": "react-example",
-  "private": true,
-  "version": "0.0.0",
+  "name": "synthoperator-domainradar",
+  "version": "2.4.0",
+  "description": "Autonomous Deterministic Decision Intelligence Engine for Domain Acquisitions, Portfolio Retention Economics, and Startup Brand Selection.",
+  "author": "Hafid Bas <support@synthoperator.com> (https://x.com/hafid_bas)",
+  "homepage": "https://synthoperator.com",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -9,10 +12,18 @@
     "start": "tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "i18n:check": "node scripts/check-i18n.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peacehritik/synthoperator-domainradar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/peacehritik/synthoperator-domainradar/issues"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "lucide-react": "^0.546.0",

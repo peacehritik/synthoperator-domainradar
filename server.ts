@@ -9,6 +9,7 @@ import {
   computeBuyDecision,
   computeRenewalDecision,
   evaluateBrandSelection,
+  generateBrandSelectionHash,
   buildJEVState,
   getFromCache,
   setInCache,
@@ -26,7 +27,6 @@ import {
 } from './server/domainEngine.js';
 import { queryTypeSafeJEV, type JEVSystemOneState, type JEVResponse } from './server/typesafeJev.js';
 import { fetchFreeEvidence } from './server/freeEvidenceProvider.js';
-import { analyzeDomainWithGemini } from './server/gemini.js';
 import { outcomesEngine } from './server/outcomesEngine.js';
 import type { AuditVersionTrace, UserManualEvidenceOverrides, BusinessContext } from './src/types.js';
 
@@ -37,12 +37,118 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const APP_NAME = process.env.APP_NAME || 'DomainRadar';
+const APP_URL = (process.env.APP_URL || 'https://domainradar.ai').replace(/\/+$/, '');
 
 app.use(express.json({ limit: '2mb' }));
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+/**
+ * Route: /robots.txt
+ * Dynamic search engine indexing rules and sitemap pointer
+ */
+app.get('/robots.txt', (req, res) => {
+  const host = req.get('host') || new URL(APP_URL).hostname;
+  const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const targetBase = process.env.APP_URL ? APP_URL : `${protocol}://${host}`;
+  res.type('text/plain');
+  res.send(`User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /watchlist
+Disallow: /*/watchlist
+
+Sitemap: ${targetBase}/sitemap.xml
+`);
+});
+
+/**
+ * Route: /sitemap.xml
+ * Dynamic multi-language sitemap with Google-compliant xhtml:link hreflang annotations
+ */
+app.get('/sitemap.xml', (req, res) => {
+  const host = req.get('host') || new URL(APP_URL).hostname;
+  const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const baseUrl = process.env.APP_URL ? APP_URL : `${protocol}://${host}`;
+  const now = new Date().toISOString().split('T')[0];
+
+  const languages = ['en', 'fr', 'ar', 'es', 'pt'];
+  const tlds = ['com', 'ai', 'io', 'org', 'net', 'co', 'dev', 'app', 'ma', 'fr'];
+  const strategies = ['brandable', 'exact-match-keyword', 'geo-service', 'short-acronym-numeric', 'tech-trend'];
+  const staticPages = [
+    { path: '', priority: '1.0', changefreq: 'daily' },
+    { path: 'audit', priority: '0.9', changefreq: 'daily' },
+    { path: 'brand-selection', priority: '0.9', changefreq: 'weekly' },
+    { path: 'bulk', priority: '0.8', changefreq: 'weekly' },
+    { path: 'outcomes', priority: '0.8', changefreq: 'daily' },
+    { path: 'privacy', priority: '0.4', changefreq: 'monthly' },
+    { path: 'terms', priority: '0.4', changefreq: 'monthly' },
+  ];
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+
+  // Static multi-language pages
+  for (const page of staticPages) {
+    for (const lang of languages) {
+      const locPath = lang === 'en' ? (page.path ? `/${page.path}` : '/') : `/${lang}${page.path ? `/${page.path}` : ''}`;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${locPath}</loc>\n`;
+      xml += `    <lastmod>${now}</lastmod>\n`;
+      xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+      xml += `    <priority>${page.priority}</priority>\n`;
+      for (const altLang of languages) {
+        const altPath = altLang === 'en' ? (page.path ? `/${page.path}` : '/') : `/${altLang}${page.path ? `/${page.path}` : ''}`;
+        xml += `    <xhtml:link rel="alternate" hreflang="${altLang}" href="${baseUrl}${altPath}"/>\n`;
+      }
+      xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${baseUrl}${page.path ? `/${page.path}` : '/'}" />\n`;
+      xml += `  </url>\n`;
+    }
+  }
+
+  // Programmatic TLD due diligence hubs
+  for (const tld of tlds) {
+    for (const lang of languages) {
+      const locPath = lang === 'en' ? `/tld/${tld}` : `/${lang}/tld/${tld}`;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${locPath}</loc>\n`;
+      xml += `    <lastmod>${now}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.7</priority>\n`;
+      for (const altLang of languages) {
+        const altPath = altLang === 'en' ? `/tld/${tld}` : `/${altLang}/tld/${tld}`;
+        xml += `    <xhtml:link rel="alternate" hreflang="${altLang}" href="${baseUrl}${altPath}"/>\n`;
+      }
+      xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${baseUrl}/tld/${tld}" />\n`;
+      xml += `  </url>\n`;
+    }
+  }
+
+  // Programmatic Investment Strategy hubs
+  for (const strat of strategies) {
+    for (const lang of languages) {
+      const locPath = lang === 'en' ? `/strategy/${strat}` : `/${lang}/strategy/${strat}`;
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${locPath}</loc>\n`;
+      xml += `    <lastmod>${now}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.7</priority>\n`;
+      for (const altLang of languages) {
+        const altPath = altLang === 'en' ? `/strategy/${strat}` : `/${altLang}/strategy/${strat}`;
+        xml += `    <xhtml:link rel="alternate" hreflang="${altLang}" href="${baseUrl}${altPath}"/>\n`;
+      }
+      xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${baseUrl}/strategy/${strat}" />\n`;
+      xml += `  </url>\n`;
+    }
+  }
+
+  xml += `</urlset>`;
+  res.type('application/xml');
+  res.send(xml);
 });
 
 /**
@@ -55,12 +161,6 @@ app.all('/api/domains/check', async (req, res) => {
     const sanitized = sanitizeDomain(rawDomain);
     if (!sanitized) {
       return res.status(400).json({ error: 'Valid domain name required' });
-    }
-
-    // Check custom registrar key forwarding
-    const customRegistrarKey = req.headers['x-registrar-key'] as string | undefined;
-    if (customRegistrarKey) {
-      // Kept server-side, never returned to browser
     }
 
     const rdapData = await checkDomainAvailability(sanitized);
@@ -121,7 +221,7 @@ app.post('/api/domains/valuation', async (req, res) => {
 
 /**
  * Route: /api/domains/renew
- * Mode B decision engine: Portfolio Renewal vs Drop evaluation.
+ * Mode B decision engine: Portfolio Renewal vs Drop evaluation powered purely by TypeSafe JEV.
  */
 app.post('/api/domains/renew', async (req, res) => {
   try {
@@ -140,20 +240,8 @@ app.post('/api/domains/renew', async (req, res) => {
     const jev = await queryTypeSafeJEV(jevState, 'renew', typesafeKey);
     const renewalResult = computeRenewalDecision({ ...body, domain: sanitized }, valuation, jev);
 
-    // Optional Gemini AI intelligence for portfolio advice
-    const aiAnalysis = await analyzeDomainWithGemini(sanitized, 'renew', {
-      length: valuation.length,
-      syllables: valuation.syllables,
-      tld: valuation.extension.tld,
-      tldTier: valuation.extension.tier,
-      estimatedValue: valuation.estimatedValue,
-      annualCarryingCost: renewalResult.valuation.annualCarryingCost,
-      brandabilityScore: valuation.brandabilityScore,
-    });
-
     return res.json({
       decision: renewalResult,
-      aiAnalysis,
       jev,
       rawJevPayload: jev.rawJevPayload,
       rawJevResponse: jev.rawJevResponse,
@@ -237,7 +325,7 @@ app.all('/api/typesafe/status', async (req, res) => {
 
 /**
  * Route: /api/domains/audit
- * Unified audit engine for Mode A (Buy) or Mode B (Renew) with RDAP, Valuation & AI.
+ * Unified audit engine for Mode A (Buy) or Mode B (Renew) with RDAP, Free Evidence & TypeSafe JEV.
  * Implements deterministic SHA-256 state hashing and multi-tiered cache invalidation.
  */
 app.post('/api/domains/audit', async (req, res) => {
@@ -252,6 +340,7 @@ app.post('/api/domains/audit', async (req, res) => {
       holdingYears,
       monthlyImpressions,
       manual_overrides,
+      custom_weights,
       force_refresh = false,
     } = req.body;
 
@@ -361,7 +450,7 @@ app.post('/api/domains/audit', async (req, res) => {
     let renewalDecision = null;
 
     if (mode === 'buy') {
-      buyDecision = computeBuyDecision(valuation, rdap, jev, freeEvidence, manual_overrides);
+      buyDecision = computeBuyDecision(valuation, rdap, jev, freeEvidence, manual_overrides, custom_weights);
     } else {
       renewalDecision = computeRenewalDecision(
         { ...(renewalInput || {}), domain: sanitized },
@@ -371,16 +460,6 @@ app.post('/api/domains/audit', async (req, res) => {
         manual_overrides
       );
     }
-
-    const aiAnalysis = await analyzeDomainWithGemini(sanitized, mode, {
-      length: valuation.length,
-      syllables: valuation.syllables,
-      tld: valuation.extension.tld,
-      tldTier: valuation.extension.tier,
-      estimatedValue: valuation.estimatedValue,
-      annualCarryingCost: valuation.annualCarryingCost,
-      brandabilityScore: valuation.brandabilityScore,
-    });
 
     const executionSource =
       jev.source === 'api.typesafe.ai' ? 'primary_jev_api' : 'local_contract_fallback';
@@ -422,7 +501,6 @@ app.post('/api/domains/audit', async (req, res) => {
       rawJevPayload: jev.rawJevPayload,
       rawJevResponse: jev.rawJevResponse,
       latencyMs: jev.latencyMs,
-      aiAnalysis,
       timestamp: new Date().toISOString(),
     };
 
@@ -627,7 +705,7 @@ app.post('/api/domains/bulk-audit', async (req, res) => {
 /**
  * Route: /api/domains/brand-selection
  * Mode C: Business Brand Selection & Multi-Domain Comparative Decision Engine
- * Evaluates up to 10 candidates against structured business context.
+ * Evaluates up to 10 candidates against structured business context with SHA-256 caching.
  */
 app.post('/api/domains/brand-selection', async (req, res) => {
   try {
@@ -644,12 +722,39 @@ app.post('/api/domains/brand-selection', async (req, res) => {
     const typesafeKey =
       (req.headers['x-typesafe-key'] as string) || process.env.TYPESAFE_API_KEY;
 
+    // Cache lookup by State Hash (TTL 2h)
+    const reportHash = generateBrandSelectionHash(business as BusinessContext, domains);
+    const cacheKey = `brand_selection:${reportHash}`;
+
+    if (force_refresh) {
+      purgeCacheKey(cacheKey);
+    } else {
+      const cached = getFromCache<any>(cacheKey);
+      if (cached) {
+        return res.json({
+          ...cached.data,
+          cached: true,
+          cachedAt: cached.cachedAt,
+          version_trace: {
+            ...cached.data.version_trace,
+            cache_hit: true,
+            latency_ms: 4,
+            execution_source: 'cached_trace',
+            cache_ttl_seconds_remaining: cached.ttlSecondsRemaining,
+          },
+        });
+      }
+    }
+
     const report = await evaluateBrandSelection(
       business as BusinessContext,
       domains,
       typesafeKey,
       Boolean(force_refresh)
     );
+
+    // Save in Cache (2 hours)
+    setInCache(cacheKey, report, CACHE_TTLS.STATE_HASH);
 
     return res.json(report);
   } catch (err: any) {
@@ -752,7 +857,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`DomainRadar Server active on http://0.0.0.0:${PORT}`);
+    console.log(`${APP_NAME} Server active on http://0.0.0.0:${PORT}`);
   });
 }
 

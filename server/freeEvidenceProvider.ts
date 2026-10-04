@@ -36,7 +36,7 @@ export const FAMOUS_BRANDS_DICTIONARY: string[] = [
   'visa', 'mastercard', 'amex', 'americanexpress', 'discover', 'jpmorgan', 'chase', 'citi',
   'citibank', 'bankofamerica', 'wellsfargo', 'goldmansachs', 'morganstanley', 'barclays',
   'hsbc', 'bnp', 'santander', 'ubs', 'creditsuisse', 'deutschebank', 'capitalone', 'fidelity',
-  'vanguard', 'schwab', 'blackrock', 'state_street', 'klarna', 'afterpay', 'affirm', 'affirm',
+  'vanguard', 'schwab', 'blackrock', 'state_street', 'klarna', 'afterpay', 'affirm',
   'adyen', 'worldpay', 'checkout', 'wise', 'remitly', 'westernunion', 'moneygram',
 
   // Retail, E-Commerce & Consumer Goods
@@ -177,11 +177,12 @@ export function scanTrademarkCollisions(sld: string): TrademarkScanEvidence {
  */
 export async function queryWaybackCdx(domain: string): Promise<WaybackEvidence> {
   const url = `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(domain)}&output=json&limit=25&fl=timestamp,original`;
+  const appName = process.env.APP_NAME || 'DomainRadar';
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(2000),
       headers: {
-        'User-Agent': 'DomainRadar-EvidenceScanner/2.4 (Free Public Telemetry)',
+        'User-Agent': `${appName}-EvidenceScanner/2.4 (Free Public Telemetry)`,
       },
     });
 
@@ -291,11 +292,13 @@ export async function queryGoogleSuggest(sld: string): Promise<GoogleSuggestEvid
  */
 export async function queryWikipediaEntity(sld: string): Promise<WikipediaEvidence> {
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(sld)}&format=json`;
+  const appName = process.env.APP_NAME || 'DomainRadar';
+  const appUrl = process.env.APP_URL || 'https://domainradar.ai';
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(2000),
       headers: {
-        'User-Agent': 'DomainRadar-Bot/2.4 (https://domainradar.ai; info@domainradar.ai)',
+        'User-Agent': `${appName}-Bot/2.4 (${appUrl}; info@${new URL(appUrl).hostname})`,
       },
     });
 

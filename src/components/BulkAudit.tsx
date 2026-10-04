@@ -17,7 +17,9 @@ import {
   Activity,
   RotateCcw
 } from 'lucide-react';
+import { siteConfig } from '../config/site';
 import { JevInspectorModal } from './JevInspectorModal';
+import { useLanguage, LtrIsolate } from '../context/LanguageContext';
 import type { BulkItemResult, DecisionMode, WatchlistDomain } from '../types';
 
 interface BulkAuditProps {
@@ -42,7 +44,8 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
   isInWatchlist,
   onSelectDomainForSingleAudit,
 }) => {
-  const [inputText, setInputText] = useState(DEFAULT_PORTFOLIO_SAMPLE);
+  const { t } = useLanguage();
+  const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState<DecisionMode>('buy');
   const [loading, setLoading] = useState(false);
   const [forceRefresh, setForceRefresh] = useState(false);
@@ -135,7 +138,7 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `domainradar_audit_${mode}_${Date.now()}.csv`);
+    link.setAttribute('download', `${siteConfig.name.toLowerCase()}_audit_${mode}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -168,10 +171,10 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Bulk Portfolio Intelligence & CSV Batch Audit
+              {t('bulk_title')}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Paste a list of domains or drop a CSV file to evaluate carrying costs and exit values in parallel.
+              {t('bulk_subtitle')}
             </p>
           </div>
 
@@ -184,7 +187,7 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Mode A: Buy Aftermarket
+              {t('btn_mode_a')}
             </button>
             <button
               onClick={() => setMode('renew')}
@@ -194,16 +197,25 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Mode B: Renewal Keep / Drop
+              {t('btn_mode_b')}
             </button>
           </div>
         </div>
 
         <div className="pt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-2">
-            <label className="text-xs font-semibold text-slate-700 block">
-              Domain List (One domain per line or comma-separated)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 block">
+                {t('bulk_domain_list_label')}
+              </label>
+              <button
+                type="button"
+                onClick={() => setInputText(DEFAULT_PORTFOLIO_SAMPLE)}
+                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-medium hover:underline"
+              >
+                {t('bulk_load_sample')}
+              </button>
+            </div>
             <textarea
               rows={5}
               value={inputText}
@@ -216,14 +228,14 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
           <div className="flex flex-col justify-between space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
             <div>
               <span className="text-xs font-semibold text-slate-800 block mb-1">
-                Upload CSV File
+                {t('bulk_upload_title')}
               </span>
               <p className="text-[11px] text-slate-500 mb-3">
-                Upload a plain text list or registrar export containing domain names.
+                {t('bulk_upload_desc')}
               </p>
               <label className="flex items-center justify-center space-x-2 px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md cursor-pointer text-xs font-medium transition-colors shadow-xs">
                 <UploadCloud className="w-4 h-4 text-slate-500" />
-                <span>Select .csv or .txt</span>
+                <span>{t('bulk_btn_select')}</span>
                 <input
                   type="file"
                   accept=".csv,.txt"
@@ -241,7 +253,7 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
                   onChange={(e) => setForceRefresh(e.target.checked)}
                   className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                 />
-                <span>Bypass Cache (Force fresh live audit)</span>
+                <span>{t('bulk_bypass_cache')}</span>
               </label>
             </div>
 
@@ -254,18 +266,33 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
               {loading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Processing Batch...</span>
+                  <span>{t('bulk_processing')}</span>
                 </>
               ) : (
                 <>
                   <FileText className="w-4 h-4" />
-                  <span>Run Batch Audit</span>
+                  <span>{t('bulk_btn_run')}</span>
                 </>
               )}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Empty State before batch execution */}
+      {results.length === 0 && !loading && (
+        <div className="bg-white rounded-lg border border-slate-200 p-10 text-center shadow-xs space-y-2.5">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
+            <UploadCloud className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-900">
+            {t('bulk_ready_title')}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {t('bulk_ready_desc')}
+          </p>
+        </div>
+      )}
 
       {/* Results Section */}
       {results.length > 0 && (
@@ -358,14 +385,14 @@ export const BulkAudit: React.FC<BulkAuditProps> = ({
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                   <tr>
-                    <th className="px-4 py-3">Domain</th>
-                    <th className="px-4 py-3">Verdict</th>
-                    <th className="px-4 py-3 text-right">Score</th>
-                    <th className="px-4 py-3 text-right">Est. Value</th>
-                    <th className="px-4 py-3 text-right">Carrying Cost</th>
-                    <th className="px-4 py-3">TLD Tier</th>
-                    <th className="px-4 py-3">Metrics</th>
-                    <th className="px-4 py-3 text-center">Action</th>
+                    <th className="px-4 py-3">{t('th_domain')}</th>
+                    <th className="px-4 py-3">{t('th_verdict')}</th>
+                    <th className="px-4 py-3 text-right">{t('th_score')}</th>
+                    <th className="px-4 py-3 text-right">{t('th_est_value')}</th>
+                    <th className="px-4 py-3 text-right">{t('th_carrying_cost')}</th>
+                    <th className="px-4 py-3">{t('th_tld_tier')}</th>
+                    <th className="px-4 py-3">{t('th_metrics')}</th>
+                    <th className="px-4 py-3 text-center">{t('th_action')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">

@@ -23,6 +23,8 @@ import {
   Check,
   Globe
 } from 'lucide-react';
+import { siteConfig } from '../config/site';
+import { useLanguage, LtrIsolate } from '../context/LanguageContext';
 import type { 
   DomainOutcomeRecord, 
   CalibrationMetricsReport, 
@@ -31,6 +33,7 @@ import type {
 } from '../types';
 
 export const OutcomesDashboard: React.FC = () => {
+  const { t } = useLanguage();
   const [outcomes, setOutcomes] = useState<DomainOutcomeRecord[]>([]);
   const [metrics, setMetrics] = useState<CalibrationMetricsReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -246,7 +249,7 @@ export const OutcomesDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `domainradar_outcomes_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `${siteConfig.name.toLowerCase()}_outcomes_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -258,38 +261,38 @@ export const OutcomesDashboard: React.FC = () => {
       case 'sold_profitable':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-            Sold (Profitable)
+            {t('outcomes_sold_profitable')}
           </span>
         );
       case 'sold_break_even':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            Sold (Break-even)
+            {t('outcomes_sold_breakeven')}
           </span>
         );
       case 'sold_loss':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
-            Sold (Loss)
+            {t('outcomes_sold_loss')}
           </span>
         );
       case 'renewed_retained':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-            Renewed (Retained)
+            {t('outcomes_renewed_retained')}
           </span>
         );
       case 'dropped_abandoned':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-800 border border-slate-300">
-            Dropped
+            {t('outcomes_dropped')}
           </span>
         );
       case 'holding':
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-            Active Holding
+            {t('outcomes_active_hold')}
           </span>
         );
     }
@@ -310,14 +313,14 @@ export const OutcomesDashboard: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Real-World Outcomes &amp; Model Calibration
+              {t('outcomes_title')}
             </h1>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-              Actuarial Feedback Loop
+              {t('outcomes_badge')}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl">
-            Track actual acquisitions, secondary market exits, realized net P&amp;L, and evaluate JEV prediction precision against realized domain trades.
+            {t('outcomes_subtitle')}
           </p>
         </div>
 
@@ -329,7 +332,7 @@ export const OutcomesDashboard: React.FC = () => {
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-semibold shadow-2xs transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <span>{t('outcomes_btn_refresh')}</span>
           </button>
 
           <button
@@ -339,7 +342,7 @@ export const OutcomesDashboard: React.FC = () => {
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-semibold shadow-2xs transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
+            <span>{t('btn_export_csv')}</span>
           </button>
 
           <button
@@ -348,7 +351,7 @@ export const OutcomesDashboard: React.FC = () => {
             className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Log Domain Asset</span>
+            <span>{t('outcomes_btn_log')}</span>
           </button>
         </div>
       </div>
@@ -367,7 +370,7 @@ export const OutcomesDashboard: React.FC = () => {
           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-semibold text-slate-500 tracking-wider">
-                Realized Net P&amp;L
+                {t('outcomes_kpi_pnl')}
               </span>
               <div className={`p-1.5 rounded-md ${metrics.total_realized_pnl_usd >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                 <DollarSign className="w-4 h-4" />
@@ -375,13 +378,12 @@ export const OutcomesDashboard: React.FC = () => {
             </div>
             <div className="mt-2 flex items-baseline space-x-2">
               <span className={`text-2xl font-extrabold font-mono ${metrics.total_realized_pnl_usd >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {metrics.total_realized_pnl_usd >= 0 ? '+' : ''}${metrics.total_realized_pnl_usd.toLocaleString()}
+                <LtrIsolate>{metrics.total_realized_pnl_usd >= 0 ? '+' : ''}${metrics.total_realized_pnl_usd.toLocaleString()}</LtrIsolate>
               </span>
               <span className="text-xs text-slate-500 font-mono">USD</span>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-              <span>{metrics.completed_exits_count} completed exits</span>
-              <span className="font-mono text-slate-500">{metrics.active_holdings_count} active holds</span>
+              <span>{t('outcomes_kpi_pnl_sub', { closed: metrics.completed_exits_count, active: metrics.active_holdings_count })}</span>
             </div>
           </div>
 
@@ -389,7 +391,7 @@ export const OutcomesDashboard: React.FC = () => {
           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-semibold text-slate-500 tracking-wider">
-                Model BUY Precision
+                {t('outcomes_kpi_precision')}
               </span>
               <div className="p-1.5 rounded-md bg-emerald-50 text-emerald-600">
                 <Target className="w-4 h-4" />
@@ -397,13 +399,13 @@ export const OutcomesDashboard: React.FC = () => {
             </div>
             <div className="mt-2 flex items-baseline space-x-2">
               <span className="text-2xl font-extrabold font-mono text-slate-900">
-                {metrics.buy_verdict_precision_pct}%
+                <LtrIsolate>{metrics.buy_verdict_precision_pct}%</LtrIsolate>
               </span>
-              <span className="text-xs text-emerald-700 font-medium font-mono">Profitable Exits</span>
+              <span className="text-xs text-emerald-700 font-medium font-mono">{t('outcomes_kpi_precision_label')}</span>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-              <span>Exit win-rate</span>
-              <span className="font-mono text-slate-500">Benchmark: &gt; 70%</span>
+              <span>{t('outcomes_exit_winrate')}</span>
+              <span className="font-mono text-slate-500"><LtrIsolate>{t('outcomes_benchmark')}</LtrIsolate></span>
             </div>
           </div>
 
@@ -411,7 +413,7 @@ export const OutcomesDashboard: React.FC = () => {
           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-semibold text-slate-500 tracking-wider">
-                Valuation MAPE Error
+                {t('outcomes_kpi_mape')}
               </span>
               <div className="p-1.5 rounded-md bg-blue-50 text-blue-600">
                 <Scale className="w-4 h-4" />
@@ -419,13 +421,13 @@ export const OutcomesDashboard: React.FC = () => {
             </div>
             <div className="mt-2 flex items-baseline space-x-2">
               <span className="text-2xl font-extrabold font-mono text-slate-900">
-                {metrics.valuation_error_pct}%
+                <LtrIsolate>{metrics.valuation_error_pct}%</LtrIsolate>
               </span>
-              <span className="text-xs text-slate-500 font-mono">Mean Absolute Error</span>
+              <span className="text-xs text-slate-500 font-mono">{t('outcomes_kpi_mape_label')}</span>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-              <span>EV vs. Realized Sale</span>
-              <span className="font-mono text-emerald-700 font-medium">Institutional Grade</span>
+              <span>{t('outcomes_ev_vs_realized')}</span>
+              <span className="font-mono text-emerald-700 font-medium">{t('outcomes_inst_grade')}</span>
             </div>
           </div>
 
@@ -433,7 +435,7 @@ export const OutcomesDashboard: React.FC = () => {
           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-semibold text-slate-500 tracking-wider">
-                Signal Distribution
+                {t('outcomes_kpi_signals')}
               </span>
               <div className="p-1.5 rounded-md bg-purple-50 text-purple-600">
                 <PieChart className="w-4 h-4" />
@@ -463,9 +465,9 @@ export const OutcomesDashboard: React.FC = () => {
               />
             </div>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-600">
-              <span className="text-emerald-700 font-semibold">{metrics.decision_distribution.buy_pct}% Buy</span>
-              <span className="text-amber-700">{metrics.decision_distribution.review_pct}% Rev</span>
-              <span className="text-rose-700">{metrics.decision_distribution.pass_pct}% Pass</span>
+              <span className="text-emerald-700 font-semibold"><LtrIsolate>{metrics.decision_distribution.buy_pct}%</LtrIsolate> {t('verdict_buy')}</span>
+              <span className="text-amber-700"><LtrIsolate>{metrics.decision_distribution.review_pct}%</LtrIsolate> {t('verdict_review')}</span>
+              <span className="text-rose-700"><LtrIsolate>{metrics.decision_distribution.pass_pct}%</LtrIsolate> {t('verdict_pass')}</span>
             </div>
           </div>
         </div>
@@ -500,24 +502,30 @@ export const OutcomesDashboard: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/80 border border-current font-mono">
                     {metrics.calibration_health === 'healthy'
-                      ? 'Calibration Status: Healthy'
+                      ? t('outcomes_status_healthy')
                       : metrics.calibration_health === 'overly_optimistic'
-                      ? 'Calibration Alert: Overly Optimistic Drift'
-                      : 'Calibration Alert: Overly Conservative Drift'}
+                      ? t('outcomes_status_optimistic')
+                      : t('outcomes_status_conservative')}
                   </span>
                   <span className="text-xs text-slate-600 font-mono">
-                    Sample Basis: {metrics.total_tracked_assets} domains
+                    {t('outcomes_sample_basis', { count: metrics.total_tracked_assets })}
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm font-medium mt-1">
-                  {metrics.tuning_recommendation}
+                  {metrics.tuning_recommendation.includes('No tracked')
+                    ? t('outcomes_rec_empty')
+                    : metrics.tuning_recommendation.includes('well-calibrated')
+                    ? t('outcomes_rec_healthy')
+                    : metrics.tuning_recommendation.includes('over-issuing')
+                    ? t('outcomes_rec_optimistic')
+                    : t('outcomes_rec_conservative')}
                 </p>
               </div>
             </div>
 
             <div className="text-right sm:shrink-0 text-xs font-mono opacity-80">
-              <span>Rule Engine v2.4.0</span>
-              <span className="block text-[11px] opacity-75">Auto-tuned parameters</span>
+              <span>{t('outcomes_engine_version')}</span>
+              <span className="block text-[11px] opacity-75">{t('outcomes_auto_tuned')}</span>
             </div>
           </div>
         </div>
@@ -531,42 +539,42 @@ export const OutcomesDashboard: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search tracked domains..."
+            placeholder={t('outcomes_search_placeholder')}
             className="w-full pl-9 pr-4 py-1.5 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="flex items-center space-x-1.5">
-            <span className="text-slate-500 font-medium">Status:</span>
+            <span className="text-slate-500 font-medium">{t('outcomes_filter_status')}</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="py-1 px-2.5 rounded-md border border-slate-300 text-slate-700 bg-white font-medium focus:outline-hidden"
             >
-              <option value="all">All Outcomes</option>
-              <option value="holding">Active Holdings</option>
-              <option value="sold_profitable">Sold (Profitable)</option>
-              <option value="sold_break_even">Sold (Break-even)</option>
-              <option value="sold_loss">Sold (Loss)</option>
-              <option value="renewed_retained">Renewed (Retained)</option>
-              <option value="dropped_abandoned">Dropped / Abandoned</option>
+              <option value="all">{t('outcomes_all_outcomes')}</option>
+              <option value="holding">{t('outcomes_active_hold')}</option>
+              <option value="sold_profitable">{t('outcomes_sold_profitable')}</option>
+              <option value="sold_break_even">{t('outcomes_sold_breakeven')}</option>
+              <option value="sold_loss">{t('outcomes_sold_loss')}</option>
+              <option value="renewed_retained">{t('outcomes_renewed_retained')}</option>
+              <option value="dropped_abandoned">{t('outcomes_dropped')}</option>
             </select>
           </div>
 
           <div className="flex items-center space-x-1.5">
-            <span className="text-slate-500 font-medium">Strategy:</span>
+            <span className="text-slate-500 font-medium">{t('outcomes_filter_strategy')}</span>
             <select
               value={strategyFilter}
               onChange={(e) => setStrategyFilter(e.target.value)}
               className="py-1 px-2.5 rounded-md border border-slate-300 text-slate-700 bg-white font-medium focus:outline-hidden"
             >
-              <option value="all">All Archetypes</option>
-              <option value="brandable">Brandable Startup</option>
-              <option value="exact_match_keyword">Exact Match Keyword</option>
-              <option value="geo_service">Geo Service</option>
-              <option value="short_acronym_numeric">Short Acronym</option>
-              <option value="tech_trend">Tech Trend</option>
+              <option value="all">{t('outcomes_all_archetypes')}</option>
+              <option value="brandable">{t('strat_brandable')}</option>
+              <option value="exact_match_keyword">{t('strat_exact_keyword')}</option>
+              <option value="geo_service">{t('strat_geo_service')}</option>
+              <option value="short_acronym_numeric">{t('strat_short_acronym')}</option>
+              <option value="tech_trend">{t('strat_tech_trend')}</option>
             </select>
           </div>
         </div>
@@ -578,16 +586,16 @@ export const OutcomesDashboard: React.FC = () => {
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-                <th className="py-3 px-4">Domain Asset</th>
-                <th className="py-3 px-4">Strategy Archetype</th>
-                <th className="py-3 px-4">Initial Verdict</th>
-                <th className="py-3 px-4 text-right">Cost Basis</th>
-                <th className="py-3 px-4 text-right">Estimated EV</th>
-                <th className="py-3 px-4">Holding Time</th>
-                <th className="py-3 px-4">Lifecycle Status</th>
-                <th className="py-3 px-4 text-right">Actual Exit</th>
-                <th className="py-3 px-4 text-right">Realized Net P&amp;L</th>
-                <th className="py-3 px-4 text-center">Actions</th>
+                <th className="py-3 px-4">{t('th_domain')}</th>
+                <th className="py-3 px-4">{t('th_strategy')}</th>
+                <th className="py-3 px-4">{t('th_verdict')}</th>
+                <th className="py-3 px-4 text-right">{t('th_cost_basis')}</th>
+                <th className="py-3 px-4 text-right">{t('th_est_value')}</th>
+                <th className="py-3 px-4">{t('th_holding_time')}</th>
+                <th className="py-3 px-4">{t('th_status')}</th>
+                <th className="py-3 px-4 text-right">{t('th_actual_exit')}</th>
+                <th className="py-3 px-4 text-right">{t('th_net_pnl')}</th>
+                <th className="py-3 px-4 text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -598,8 +606,8 @@ export const OutcomesDashboard: React.FC = () => {
                       <Target className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="font-medium text-slate-700">
                         {outcomes.length === 0 
-                          ? "No tracked domains yet. Audit a domain in Single Audit and click 'Track Domain Outcome' to start building your real portfolio history."
-                          : "No outcome records match your filter criteria."}
+                          ? t('outcomes_empty_desc')
+                          : t('outcomes_no_matching_filter')}
                       </p>
                     </div>
                   </td>
@@ -616,10 +624,10 @@ export const OutcomesDashboard: React.FC = () => {
                       <td className="py-3 px-4 font-mono font-medium text-slate-900">
                         <div className="flex items-center space-x-1.5">
                           <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{rec.domain}</span>
+                          <span className="font-bold"><LtrIsolate>{rec.domain}</LtrIsolate></span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-sans block mt-0.5">
-                          Audit: {rec.audit_date} &bull; v{rec.engine_version}
+                          {rec.audit_date} &bull; v{rec.engine_version}
                         </span>
                       </td>
 
@@ -650,22 +658,22 @@ export const OutcomesDashboard: React.FC = () => {
 
                       {/* Acquisition Price */}
                       <td className="py-3 px-4 text-right font-mono text-slate-800">
-                        ${rec.actual_acquisition_price_usd.toLocaleString()}
+                        <LtrIsolate>${rec.actual_acquisition_price_usd.toLocaleString()}</LtrIsolate>
                       </td>
 
                       {/* Estimated EV */}
                       <td className="py-3 px-4 text-right font-mono text-slate-600">
-                        ${rec.initial_ev_usd.toLocaleString()}
+                        <LtrIsolate>${rec.initial_ev_usd.toLocaleString()}</LtrIsolate>
                       </td>
 
                       {/* Holding Time */}
                       <td className="py-3 px-4 text-slate-600 font-mono text-xs">
                         <div className="flex items-center space-x-1">
                           <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{rec.holding_duration_days} days</span>
+                          <span><LtrIsolate>{rec.holding_duration_days}</LtrIsolate> {t('days_label')}</span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-sans block">
-                          ~{Math.round((rec.holding_duration_days / 30) * 10) / 10} mos
+                          {t('mos_approx', { val: Math.round((rec.holding_duration_days / 30) * 10) / 10 })}
                         </span>
                       </td>
 
@@ -678,10 +686,10 @@ export const OutcomesDashboard: React.FC = () => {
                       <td className="py-3 px-4 text-right font-mono">
                         {hasExit ? (
                           <span className="font-semibold text-slate-900">
-                            ${rec.actual_sale_price_usd?.toLocaleString()}
+                            <LtrIsolate>${rec.actual_sale_price_usd?.toLocaleString()}</LtrIsolate>
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic text-xs">Active hold</span>
+                          <span className="text-slate-400 italic text-xs">{t('outcomes_active_hold_short')}</span>
                         )}
                       </td>
 
@@ -690,16 +698,16 @@ export const OutcomesDashboard: React.FC = () => {
                         {netPnl !== null ? (
                           <div>
                             <span className={`font-bold ${netPnl >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                              {netPnl >= 0 ? '+' : ''}${netPnl.toLocaleString()}
+                              <LtrIsolate>{netPnl >= 0 ? '+' : ''}${netPnl.toLocaleString()}</LtrIsolate>
                             </span>
                             {roi !== null && (
                               <span className={`block text-[10px] font-semibold ${roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                ({roi >= 0 ? '+' : ''}{roi}%)
+                                <LtrIsolate>({roi >= 0 ? '+' : ''}{roi}%)</LtrIsolate>
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic text-xs">Unrealized</span>
+                          <span className="text-slate-400 italic text-xs">{t('outcomes_unrealized')}</span>
                         )}
                       </td>
 
@@ -709,16 +717,16 @@ export const OutcomesDashboard: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(rec)}
-                            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors"
-                            title="Update outcome status and sale price"
+                            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                            title={t('modal_update_outcome')}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(rec.id, rec.domain)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                            title="Remove from tracking"
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                            title="Remove"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -741,13 +749,13 @@ export const OutcomesDashboard: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Edit3 className="w-4 h-4 text-emerald-600" />
                 <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Update Outcome: {selectedRecord.domain}
+                  {t('modal_update_outcome')}: <LtrIsolate>{selectedRecord.domain}</LtrIsolate>
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -756,26 +764,26 @@ export const OutcomesDashboard: React.FC = () => {
             <form onSubmit={handleSaveUpdate} className="p-5 space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Lifecycle Outcome Status
+                  {t('th_status')}
                 </label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value as OutcomeStatus)}
                   className="w-full px-3 py-2 rounded-md border border-slate-300 font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
-                  <option value="holding">Holding (Active Asset)</option>
-                  <option value="sold_profitable">Sold (Profitable Exit)</option>
-                  <option value="sold_break_even">Sold (Break-even Exit)</option>
-                  <option value="sold_loss">Sold (Loss Exit)</option>
-                  <option value="renewed_retained">Renewed (Retained in Portfolio)</option>
-                  <option value="dropped_abandoned">Dropped / Abandoned</option>
+                  <option value="holding">{t('outcomes_active_hold')}</option>
+                  <option value="sold_profitable">{t('outcomes_sold_profitable')}</option>
+                  <option value="sold_break_even">{t('outcomes_sold_breakeven')}</option>
+                  <option value="sold_loss">{t('outcomes_sold_loss')}</option>
+                  <option value="renewed_retained">{t('outcomes_renewed_retained')}</option>
+                  <option value="dropped_abandoned">{t('outcomes_dropped')}</option>
                 </select>
               </div>
 
               {(editStatus === 'sold_profitable' || editStatus === 'sold_break_even' || editStatus === 'sold_loss') && (
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Actual Sale Price ($ USD)
+                    {t('outcomes_actual_sale_price')}
                   </label>
                   <input
                     type="number"
@@ -792,7 +800,7 @@ export const OutcomesDashboard: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Total Holding Duration (Days)
+                  {t('outcomes_holding_duration_days')}
                 </label>
                 <input
                   type="number"
@@ -806,7 +814,7 @@ export const OutcomesDashboard: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Transaction Notes &amp; Channel
+                  {t('outcomes_notes_channel')}
                 </label>
                 <textarea
                   rows={2}
@@ -821,16 +829,16 @@ export const OutcomesDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {t('btn_cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdating}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-colors shadow-xs"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-colors shadow-xs cursor-pointer"
                 >
-                  {isUpdating ? 'Saving...' : 'Save Updates'}
+                  {isUpdating ? t('btn_saving') : t('btn_save_updates')}
                 </button>
               </div>
             </form>
@@ -846,13 +854,13 @@ export const OutcomesDashboard: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <BookmarkPlus className="w-4 h-4 text-emerald-600" />
                 <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Log Domain Asset into Outcomes
+                  {t('modal_log_asset_title')}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -861,7 +869,7 @@ export const OutcomesDashboard: React.FC = () => {
             <form onSubmit={handleCreateRecord} className="p-5 space-y-3.5 text-xs sm:text-sm">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Domain Name
+                  {t('th_domain')}
                 </label>
                 <input
                   type="text"
@@ -876,33 +884,33 @@ export const OutcomesDashboard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Strategy Archetype
+                    {t('th_strategy')}
                   </label>
                   <select
                     value={newStrategy}
                     onChange={(e) => setNewStrategy(e.target.value as DomainStrategyType)}
                     className="w-full px-2.5 py-2 rounded-md border border-slate-300 font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   >
-                    <option value="brandable">Brandable Startup</option>
-                    <option value="exact_match_keyword">Exact Match</option>
-                    <option value="geo_service">Geo Service</option>
-                    <option value="short_acronym_numeric">Short Acronym</option>
-                    <option value="tech_trend">Tech Trend</option>
+                    <option value="brandable">{t('strat_brandable')}</option>
+                    <option value="exact_match_keyword">{t('strat_exact_keyword')}</option>
+                    <option value="geo_service">{t('strat_geo_service')}</option>
+                    <option value="short_acronym_numeric">{t('strat_short_acronym')}</option>
+                    <option value="tech_trend">{t('strat_tech_trend')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Initial Verdict
+                    {t('th_verdict')}
                   </label>
                   <select
                     value={newVerdict}
                     onChange={(e) => setNewVerdict(e.target.value)}
                     className="w-full px-2.5 py-2 rounded-md border border-slate-300 font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   >
-                    <option value="Buy">Buy</option>
-                    <option value="Review">Review</option>
-                    <option value="Pass">Pass</option>
+                    <option value="Buy">{t('verdict_buy')}</option>
+                    <option value="Review">{t('verdict_review')}</option>
+                    <option value="Pass">{t('verdict_pass')}</option>
                   </select>
                 </div>
               </div>
@@ -910,7 +918,7 @@ export const OutcomesDashboard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Acquisition Cost ($)
+                    {t('th_cost_basis')} ($)
                   </label>
                   <input
                     type="number"
@@ -924,7 +932,7 @@ export const OutcomesDashboard: React.FC = () => {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Estimated EV ($)
+                    {t('th_est_value')} ($)
                   </label>
                   <input
                     type="number"
@@ -939,7 +947,7 @@ export const OutcomesDashboard: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Acquisition Notes
+                  {t('th_notes')}
                 </label>
                 <textarea
                   rows={2}
@@ -954,16 +962,16 @@ export const OutcomesDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md font-semibold hover:bg-slate-50 transition-colors"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {t('btn_cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-colors shadow-xs"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-colors shadow-xs cursor-pointer"
                 >
-                  {isCreating ? 'Adding...' : 'Log Asset'}
+                  {isCreating ? t('btn_adding') : t('btn_log_asset')}
                 </button>
               </div>
             </form>
