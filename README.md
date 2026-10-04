@@ -55,6 +55,11 @@ Traditional domain appraisal tools rely on opaque linear regressions or unground
                    BUY  │  REVIEW  │  PASS  │  RENEW  │  DROP
 ```
 
+<!-- Application Screenshot -->
+<p align="center">
+  <img src="docs/assets/preview.png" alt="SynthOperator DomainRadar Preview" width="80%" />
+</p>
+
 ## 💎 Core Capabilities
 
 ### 1. Mode A — Secondary Buy Diligence
