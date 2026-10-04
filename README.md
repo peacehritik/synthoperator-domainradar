@@ -145,6 +145,59 @@ TYPESAFE_API_KEY=
 BULK_AUDIT_CONCURRENCY=4
 ```
 
+## 🔑 Dual-Mode JEV API Configuration (Interface or .env)
+
+SynthOperator DomainRadar supports **two flexible ways** to configure the TypeSafe JEV System One decision engine:
+
+| Configuration Method | How to Configure | Storage Location | Recommended Use Case |
+| :--- | :--- | :--- | :--- |
+| **Option A: In the Web Interface (BYOK)** | Open ⚙️ **Settings** in the top navigation bar and enter your key | Stored in browser `localStorage` (transmitted via `x-typesafe-key`) | Individual users, personal evaluation, demo testing |
+| **Option B: Server-Side in `.env`** | Set `TYPESAFE_API_KEY=your_key` in root `.env` | Stored securely in server environment variables | Production deployments, public multi-user hosting |
+| **Option C: Zero-Cost Local Engine (Default)** | *Leave blank (no key needed)* | In-memory deterministic contract simulation (`evaluateJEVLocally`) | Offline development, zero-budget testing |
+
+### Environment Configuration (.env)
+
+To configure the server environment, copy `.env.example`:
+
+```bash
+cp .env.example .env
+
+Edit .env:
+
+PORT=3000
+APP_NAME="SynthOperator DomainRadar"
+APP_URL="https://synthoperator.com"
+
+# Optional: Server-side TypeSafe JEV API Key (Overrides or acts as fallback)
+TYPESAFE_API_KEY=
+
+# Batch Audit Concurrency Limit (Default: 4)
+BULK_AUDIT_CONCURRENCY=4
+
+
+---
+
+## ⚙️ Environment Configuration (Optional)
+
+To enable live cloud inference with upstream TypeSafe JEV System One, copy `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+PORT=3000
+APP_NAME="SynthOperator DomainRadar"
+APP_URL="https://synthoperator.com"
+
+# Optional: Add your TypeSafe JEV API Key
+TYPESAFE_API_KEY=
+
+# Batch Audit Concurrency Limit (Default: 4)
+BULK_AUDIT_CONCURRENCY=4
+
 **Client-Side BYOK Notice:** Individual users can also supply their own TypeSafe API key directly in the browser via the Settings modal (localStorage). For multi-user public deployments, set TYPESAFE_API_KEY server-side.
 
 ## 🌐 Supported Locales & Internationalization

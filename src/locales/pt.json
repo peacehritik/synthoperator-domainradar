@@ -464,7 +464,7 @@
   "settings_subtitle": "Autenticação do motor de decisão e conexão com a API",
   "settings_engine_name": "Motor TypeSafe AI JEV",
   "settings_api_key_label": "Chave de API TypeSafe (TYPESAFE_API_KEY)",
-  "settings_api_key_hint": "Armazenada no navegador e transmitida pelo cabeçalho x-typesafe-key para o Express.",
+  "settings_api_key_hint": "Configurável diretamente aqui na interface (localStorage do navegador) ou no servidor via TYPESAFE_API_KEY no arquivo .env.",
   "settings_status_connected": "Conectado com sucesso ao api.typesafe.ai",
   "settings_status_invalid": "Chave Rejeitada (Modo Local Ativo)",
   "settings_status_fallback": "Modo Simulação Local Pronto",

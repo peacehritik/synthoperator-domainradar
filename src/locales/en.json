@@ -464,7 +464,7 @@
   "settings_subtitle": "Decision engine authentication and upstream endpoint routing",
   "settings_engine_name": "TypeSafe AI JEV Engine",
   "settings_api_key_label": "TypeSafe API Key (TYPESAFE_API_KEY)",
-  "settings_api_key_hint": "Saved in localStorage and relayed via x-typesafe-key header to Express.",
+  "settings_api_key_hint": "Can be configured directly here in the interface (browser localStorage) or server-side via TYPESAFE_API_KEY in your .env file.",
   "settings_status_connected": "Connected to api.typesafe.ai",
   "settings_status_invalid": "API Key Invalid (Local Fallback Active)",
   "settings_status_fallback": "Local Contract Simulation Ready",

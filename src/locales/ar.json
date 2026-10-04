@@ -464,7 +464,7 @@
   "settings_subtitle": "التحقق من محرك القرارات والاتصال بنقطة النهاية الرسمية",
   "settings_engine_name": "محرك TypeSafe AI JEV",
   "settings_api_key_label": "مفتاح API الخاص بـ TypeSafe (TYPESAFE_API_KEY)",
-  "settings_api_key_hint": "يُحفظ محلياً في المتصفح ويُرسل عبر ترويسة x-typesafe-key إلى الخادم.",
+  "settings_api_key_hint": "يمكن ضبط المفتاح مباشرة هنا في واجهة المستخدم (تخزين محلي بالمتصفح) أو في جانب الخادم عبر TYPESAFE_API_KEY في ملف .env.",
   "settings_status_connected": "تم الاتصال بنجاح مع api.typesafe.ai",
   "settings_status_invalid": "المفتاح غير مقبول (وضع المحاكاة المحلي نشط)",
   "settings_status_fallback": "وضع المحاكاة المحلي جاهز للاستخدام",

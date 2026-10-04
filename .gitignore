@@ -6,6 +6,9 @@ coverage/
 .vite/
 
 # Fichiers d'environnement & Secrets (Stricte exclusion)
+.env
+.env.production
+.env.local
 .env*
 !.env.example
 

@@ -464,7 +464,7 @@
   "settings_subtitle": "Authentification du moteur de décision et routage de l'API",
   "settings_engine_name": "Moteur TypeSafe AI JEV",
   "settings_api_key_label": "Clé d'API TypeSafe (TYPESAFE_API_KEY)",
-  "settings_api_key_hint": "Stockée dans localStorage et transmise via l'en-tête x-typesafe-key à Express.",
+  "settings_api_key_hint": "Configurable directement ici dans l'interface (localStorage du navigateur) ou côté serveur via TYPESAFE_API_KEY dans le fichier .env.",
   "settings_status_connected": "Connecté avec succès à api.typesafe.ai",
   "settings_status_invalid": "Clé d'API Rejetée (Mode Secours Local Actif)",
   "settings_status_fallback": "Moteur de Contrat Local Prêt (Mode Secours)",
